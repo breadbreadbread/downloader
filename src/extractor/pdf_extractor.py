@@ -1,6 +1,7 @@
 """PDF reference extractor."""
 
 import logging
+import re
 from pathlib import Path
 from typing import List, Optional
 import pdfplumber
@@ -8,19 +9,21 @@ import pdfplumber
 from src.models import ExtractionResult, Reference
 from src.extractor.base import BaseExtractor
 from src.extractor.parser import ReferenceParser
+from src.extractor.pdf.layout import LayoutAwareExtractor
 
 logger = logging.getLogger(__name__)
 
 
 class PDFExtractor(BaseExtractor):
-    """Extract references from PDF files."""
+    """Extract references from PDF files with layout-aware extraction."""
     
     def __init__(self):
         self.parser = ReferenceParser()
+        self.layout_extractor = LayoutAwareExtractor()
     
     def extract(self, source: str) -> ExtractionResult:
         """
-        Extract references from a PDF file.
+        Extract references from a PDF file using layout-aware extraction.
         
         Args:
             source: Path to PDF file
@@ -41,8 +44,13 @@ class PDFExtractor(BaseExtractor):
         
         try:
             with pdfplumber.open(pdf_path) as pdf:
-                text = self._extract_text_from_pdf(pdf)
-                references_text = self._identify_reference_section(text)
+                logger.debug(f"Processing PDF with {len(pdf.pages)} pages")
+                
+                # Use layout-aware extraction
+                references_text = self.layout_extractor.extract_reference_section(pdf)
+                logger.debug(f"Extracted {len(references_text)} characters from reference section")
+                
+                # Parse references
                 references = self._parse_references(references_text)
                 
                 result.references = references
@@ -71,54 +79,147 @@ class PDFExtractor(BaseExtractor):
         return "\n".join(text_parts)
     
     def _parse_references(self, text: str) -> List[Reference]:
-        """Parse reference text into structured references."""
+        """Parse reference text into structured references with filtering."""
         if not text or len(text.strip()) == 0:
+            logger.debug("No reference text to parse")
             return []
         
         # Split text into individual references
-        # Try multiple splitting strategies
         references_raw = self._split_references(text)
+        logger.debug(f"Split into {len(references_raw)} raw reference candidates")
         
+        # Parse and filter references
         references = []
-        for ref_text in references_raw:
+        filtered_count = 0
+        
+        for idx, ref_text in enumerate(references_raw):
             try:
+                # Check if this looks like a valid reference before parsing
+                if not self._is_valid_reference_candidate(ref_text):
+                    filtered_count += 1
+                    logger.debug(f"Filtered non-reference block #{idx + 1}: {ref_text[:50]}...")
+                    continue
+                
                 ref = self.parser.parse_reference(ref_text)
                 if ref:
                     references.append(ref)
+                else:
+                    filtered_count += 1
+                    logger.debug(f"Failed to parse reference #{idx + 1}")
             except Exception as e:
-                logger.warning(f"Error parsing reference: {str(e)}")
+                filtered_count += 1
+                logger.debug(f"Error parsing reference #{idx + 1}: {str(e)}")
+        
+        logger.debug(
+            f"Parsed {len(references)} references, filtered {filtered_count} blocks"
+        )
         
         return references
     
     def _split_references(self, text: str) -> List[str]:
-        """Split reference text into individual references."""
-        import re
+        """
+        Split reference text into individual references.
         
+        Tries multiple splitting strategies with logging.
+        """
         references = []
+        split_method = None
         
         # Try numbered references [1], [2], etc.
         numbered_pattern = r'\n\s*\[\d+\]'
-        if re.search(numbered_pattern, text):
+        matches = re.findall(numbered_pattern, text)
+        if len(matches) >= 2:
             parts = re.split(numbered_pattern, text)
             references = [p.strip() for p in parts if p.strip() and len(p.strip()) > 10]
+            split_method = "bracketed numbers [N]"
+            logger.debug(f"Using split method: {split_method}, found {len(matches)} markers")
             return references
         
         # Try numbered references 1., 2., etc.
-        numbered_pattern2 = r'\n\s*\d+\.\s'
-        if re.search(numbered_pattern2, text):
+        numbered_pattern2 = r'\n\s*\d+\.\s+'
+        matches = re.findall(numbered_pattern2, text)
+        if len(matches) >= 2:
             parts = re.split(numbered_pattern2, text)
             references = [p.strip() for p in parts if p.strip() and len(p.strip()) > 10]
+            split_method = "numbered list N."
+            logger.debug(f"Using split method: {split_method}, found {len(matches)} markers")
             return references
         
-        # Try bullet points
-        bullet_pattern = r'\n\s*[-•*]\s'
-        if re.search(bullet_pattern, text):
-            parts = re.split(bullet_pattern, text)
-            references = [p.strip() for p in parts if p.strip() and len(p.strip()) > 10]
-            return references
+        # Try DOI-based splitting
+        doi_pattern = r'(?=\n[^\n]*(?:doi|DOI|https?://doi\.org))'
+        matches = re.findall(r'(?:doi|DOI|https?://doi\.org)', text)
+        if len(matches) >= 2:
+            parts = re.split(doi_pattern, text)
+            references = [p.strip() for p in parts if p.strip() and len(p.strip()) > 20]
+            if len(references) >= 2:
+                split_method = "DOI markers"
+                logger.debug(f"Using split method: {split_method}, found {len(matches)} DOIs")
+                return references
+        
+        # Try year-based splitting (look for patterns like "(2023)" or "2023.")
+        year_pattern = r'(?=\n[^\n]*\((?:19|20)\d{2}\)|(?:19|20)\d{2}\.)'
+        matches = re.findall(r'\((?:19|20)\d{2}\)|(?:19|20)\d{2}\.', text)
+        if len(matches) >= 5:
+            parts = re.split(year_pattern, text)
+            references = [p.strip() for p in parts if p.strip() and len(p.strip()) > 20]
+            if len(references) >= 5:
+                split_method = "year markers"
+                logger.debug(f"Using split method: {split_method}, found {len(matches)} year markers")
+                return references
         
         # Fallback: split by double newlines
         parts = text.split('\n\n')
         references = [p.strip() for p in parts if p.strip() and len(p.strip()) > 10]
+        split_method = "double newlines"
+        logger.debug(f"Using fallback split method: {split_method}, found {len(references)} blocks")
         
         return references if references else [text]
+    
+    def _is_valid_reference_candidate(self, text: str) -> bool:
+        """
+        Check if a text block looks like a valid reference.
+        
+        Filters out figure captions, tables, and other non-reference content.
+        """
+        if not text or len(text.strip()) < 15:
+            logger.debug("Block too short")
+            return False
+        
+        text_lower = text.lower()
+        
+        # Filter out obvious non-references
+        caption_markers = ['figure', 'fig.', 'fig ', 'table', 'scheme']
+        starts_with_caption = any(
+            text_lower.strip().startswith(marker) for marker in caption_markers
+        )
+        
+        if starts_with_caption:
+            # Check if it has reference-like features
+            has_year = re.search(r'\b(19|20)\d{2}\b', text)
+            has_doi = 'doi' in text_lower or re.search(r'10\.\d{4,}', text)
+            has_url = 'http' in text_lower
+            
+            # If it looks like a caption without reference features, reject it
+            word_count = len(text.split())
+            if word_count < 15 and not (has_year or has_doi or has_url):
+                logger.debug(f"Rejected caption-like block: {text[:30]}...")
+                return False
+        
+        # Check for reference-like features
+        has_year = re.search(r'\b(19|20)\d{2}\b', text)
+        has_doi = 'doi' in text_lower or re.search(r'10\.\d{4,}', text)
+        has_authors = re.search(r'[A-Z][a-z]+,?\s+[A-Z]\.', text)
+        has_url = re.search(r'https?://', text)
+        
+        # At least one strong indicator should be present
+        if has_year or has_doi or has_authors or has_url:
+            return True
+        
+        # If nothing looks like a reference, check word count
+        # References are usually substantial
+        word_count = len(text.split())
+        if word_count > 8:
+            return True
+        
+        logger.debug(f"Block lacks reference indicators: {text[:30]}...")
+        return False
