@@ -9,6 +9,7 @@ from src.models import ExtractionResult, Reference
 from src.extractor.base import BaseExtractor
 from src.extractor.parser import ReferenceParser
 from src.config import settings
+from src.network.http_client import HTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +19,7 @@ class WebExtractor(BaseExtractor):
     
     def __init__(self):
         self.parser = ReferenceParser()
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": settings.USER_AGENT})
+        self.http_client = HTTPClient()
     
     def extract(self, source: str) -> ExtractionResult:
         """
@@ -38,12 +38,10 @@ class WebExtractor(BaseExtractor):
             return result
         
         try:
-            response = self.session.get(
+            response = self.http_client.get(
                 source,
-                timeout=settings.TIMEOUT,
-                verify=True
+                allow_redirects=True
             )
-            response.raise_for_status()
             
             html_text = response.text
             references_text = self._extract_references_from_html(html_text)
@@ -55,10 +53,12 @@ class WebExtractor(BaseExtractor):
             logger.info(f"Extracted {len(references)} references from {source}")
             
         except requests.RequestException as e:
-            result.extraction_errors.append(f"Error fetching URL: {str(e)}")
+            error_msg = f"Error fetching URL: {str(e)}"
+            result.extraction_errors.append(error_msg)
             logger.error(f"Error fetching {source}: {str(e)}")
         except Exception as e:
-            result.extraction_errors.append(f"Error extracting references: {str(e)}")
+            error_msg = f"Error extracting references: {str(e)}"
+            result.extraction_errors.append(error_msg)
             logger.error(f"Error extracting from {source}: {str(e)}")
         
         return result

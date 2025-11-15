@@ -133,7 +133,19 @@ This is normal - not all papers are freely available online. The tool tries mult
 
 ### Network errors?
 
-Check your internet connection and try again. The tool has built-in retry logic.
+Check your internet connection and try again. The tool has built-in retry logic with automatic User-Agent rotation on 403 Forbidden errors.
+
+### Getting 403 Forbidden errors on --url?
+
+The tool now automatically handles this with:
+- User-Agent rotation from a pool of 6 browser variants
+- Automatic retry with fresh headers
+- Exponential backoff
+
+Enable debug mode to see the retry attempts:
+```bash
+python -m src.main --url https://example.com --log-level DEBUG
+```
 
 ## Next Steps
 
