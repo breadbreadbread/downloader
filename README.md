@@ -67,6 +67,7 @@ The project uses carefully versioned dependencies to ensure compatibility and se
 
 **Development Dependencies (optional):**
 - pytest, black, isort, flake8, mypy, pylint for development
+- pytest-cov for coverage reporting and enforcement
 - pip-audit for security scanning
 - responses for HTTP mocking in tests
 
@@ -218,9 +219,129 @@ Typical performance on a modern system:
 - Sci-Hub access depends on your jurisdiction's regulations
 - Citation of papers and sources is encouraged
 
+## Development Workflow
+
+This project includes comprehensive automation for dependency management, testing, and quality assurance.
+
+### Quick Start for Developers
+
+```bash
+# Install all dependencies (including dev tools)
+make install-dev
+
+# Run the full validation suite (recommended before commits)
+make validate
+
+# Run individual checks
+make test-coverage    # Tests with 80% coverage enforcement
+make security-check   # pip check + pip-audit
+make lint            # Code quality checks
+```
+
+### Available Make Commands
+
+| Command | Description |
+|---------|-------------|
+| `make install` | Install runtime dependencies only |
+| `make install-dev` | Install all dependencies including dev tools |
+| `make test` | Run unit tests |
+| `make test-coverage` | Run tests with coverage (enforces 80% minimum) |
+| `make validate` | Run full validation (pip check + pip-audit + coverage) |
+| `make security-check` | Run security checks only (pip check + pip-audit) |
+| `make lint` | Run linting tools (black, isort, flake8, mypy) |
+| `make format` | Format code (black, isort) |
+| `make clean` | Clean temporary files and artifacts |
+| `make ci` | Run full CI pipeline locally |
+
+### Dependency Validation
+
+The project includes automated dependency validation that checks:
+
+1. **pip check** - Ensures no broken requirements or version conflicts
+2. **pip-audit** - Scans for known security vulnerabilities
+   - Automatically allows the known pdfminer.six vulnerability (GHSA-f83h-ghpp-7wcc)
+   - Fails on any unapproved vulnerabilities
+3. **Coverage** - Enforces 80% minimum test coverage
+
+```bash
+# Run validation manually
+python scripts/validate_dependencies.py --coverage --verbose
+
+# Or use the Makefile target
+make validate
+```
+
+### Test Coverage
+
+- **Minimum requirement**: 80% line coverage
+- **Reports**: Generated in XML (for CI) and terminal formats
+- **Configuration**: See `pytest.ini` for settings
+
+```bash
+# Run coverage check
+pytest --cov=src --cov-report=xml --cov-fail-under=80
+
+# Or use the Makefile target
+make test-coverage
+```
+
+### Security Auditing
+
+```bash
+# Quick security check
+pip-audit
+
+# Detailed validation with allowlist handling
+python scripts/validate_dependencies.py --verbose
+```
+
+### CI/CD Integration
+
+The project includes a GitHub Actions workflow (`.github/workflows/ci.yml`) that:
+
+- Tests on Python 3.8 (minimum) and 3.12 (current)
+- Runs linting, formatting checks, and security validation
+- Enforces 80% test coverage
+- Uploads coverage reports to Codecov
+- Fails builds on dependency conflicts or unapproved vulnerabilities
+- Comments pull requests with validation results
+
+### Validation Results
+
+Validation results are saved to `validation-results.json` for CI/CD integration:
+
+```json
+{
+  "pip_check": {
+    "status": "passed",
+    "output": "No broken requirements found",
+    "error": ""
+  },
+  "pip_audit": {
+    "status": "passed_with_allowed",
+    "vulnerabilities": [...],
+    "output": "",
+    "error": ""
+  },
+  "coverage": {
+    "status": "passed",
+    "percentage": 85.2,
+    "output": "",
+    "error": ""
+  }
+}
+```
+
 ## Contributing
 
-Contributions are welcome! Areas for improvement:
+Contributions are welcome! Please ensure:
+
+1. **Code Quality**: Run `make lint` and `make format` before submitting
+2. **Tests**: Maintain >80% test coverage (`make test-coverage`)
+3. **Dependencies**: Run `make validate` to check for security issues
+4. **Documentation**: Update relevant documentation
+
+Areas for improvement:
 - Additional download sources
 - Better reference parsing
 - Performance optimization
