@@ -287,6 +287,20 @@ python -m src.main --help  # Verify CLI works
 - Only process trusted PDF documents (vulnerability in pdfminer.six CMap loading)
 - Secure API keys and credentials in environment variables
 
+## Quality Assurance & Testing
+
+For comprehensive testing strategy, validation procedures, and quality assurance guidelines, see the **[Testing and Validation Plan](docs/testing/validation_plan.md)**.
+
+Key testing areas covered:
+- Unit tests for all core components (current: 18 tests)
+- Integration tests for end-to-end workflows
+- HTTP hardening and failure scenario validation
+- Performance benchmarking and regression testing
+- Dependency security auditing
+- Manual validation with real-world academic papers
+- CLI interface testing
+- Coverage targets (>80% line coverage)
+
 ## Future Enhancements
 
 - GUI interface using PyQt/Tkinter
