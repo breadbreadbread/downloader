@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
+from src.config import settings
+from src.http_client import HTTPClient
 from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
 
 logger = logging.getLogger(__name__)
@@ -13,8 +15,9 @@ logger = logging.getLogger(__name__)
 class BaseDownloader(ABC):
     """Abstract base class for paper downloaders."""
     
-    def __init__(self):
-        self.timeout = 30
+    def __init__(self, http_client: Optional[HTTPClient] = None):
+        self.timeout = settings.TIMEOUT
+        self.http_client = http_client or HTTPClient(logger=logger)
     
     @abstractmethod
     def can_download(self, reference: Reference) -> bool:

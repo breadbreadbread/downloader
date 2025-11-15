@@ -1,15 +1,16 @@
 """Sci-Hub downloader."""
 
 import logging
-import requests
+import time
 from pathlib import Path
 from typing import Optional
-from bs4 import BeautifulSoup
-import time
 
-from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
-from src.downloader.base import BaseDownloader
+from bs4 import BeautifulSoup
+
 from src.config import settings
+from src.downloader.base import BaseDownloader
+from src.http_client import HTTPClient, HTTPClientError
+from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,8 @@ logger = logging.getLogger(__name__)
 class SciHubDownloader(BaseDownloader):
     """Download papers from Sci-Hub."""
     
-    def __init__(self):
-        super().__init__()
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": settings.USER_AGENT})
+    def __init__(self, http_client: Optional[HTTPClient] = None):
+        super().__init__(http_client=http_client)
         self.scihub_urls = settings.SCIHUB_URLS
     
     def can_download(self, reference: Reference) -> bool:
@@ -89,12 +88,12 @@ class SciHubDownloader(BaseDownloader):
             search_url = f"{scihub_url}/?q={query}"
             logger.info(f"Searching Sci-Hub mirror {scihub_url} for: {query}")
             
-            response = self.session.get(
+            response = self.http_client.get(
                 search_url,
                 timeout=self.timeout,
-                allow_redirects=True
+                allow_redirects=True,
+                verify=True,
             )
-            response.raise_for_status()
             
             # Parse response to find PDF link
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -108,8 +107,8 @@ class SciHubDownloader(BaseDownloader):
             
             return None
         
-        except requests.RequestException as e:
-            logger.debug(f"Error with Sci-Hub mirror {scihub_url}: {str(e)}")
+        except HTTPClientError as exc:
+            logger.debug("Error with Sci-Hub mirror %s: %s", scihub_url, exc)
             return None
         except Exception as e:
             logger.warning(f"Error parsing Sci-Hub response: {str(e)}")
@@ -156,12 +155,12 @@ class SciHubDownloader(BaseDownloader):
     ) -> Optional[DownloadResult]:
         """Download PDF from URL."""
         try:
-            response = self.session.get(
+            response = self.http_client.get(
                 pdf_url,
                 timeout=self.timeout,
-                allow_redirects=True
+                allow_redirects=True,
+                verify=True,
             )
-            response.raise_for_status()
             
             content = response.content
             file_size = self._save_pdf(content, output_path)
@@ -180,6 +179,9 @@ class SciHubDownloader(BaseDownloader):
                     error_message="Invalid PDF content"
                 )
         
+        except HTTPClientError as exc:
+            logger.warning("Error downloading PDF from %s: %s", pdf_url, exc)
+            return None
         except Exception as e:
             logger.warning(f"Error downloading PDF from {pdf_url}: {str(e)}")
             return None

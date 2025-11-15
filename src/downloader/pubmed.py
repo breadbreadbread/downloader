@@ -1,13 +1,13 @@
 """PubMed and PubMed Central downloader."""
 
 import logging
-import requests
 from pathlib import Path
 from typing import Optional
 
-from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
-from src.downloader.base import BaseDownloader
 from src.config import settings
+from src.downloader.base import BaseDownloader
+from src.http_client import HTTPClient, HTTPClientError
+from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +15,8 @@ logger = logging.getLogger(__name__)
 class PubMedDownloader(BaseDownloader):
     """Download papers from PubMed Central."""
     
-    def __init__(self):
-        super().__init__()
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": settings.USER_AGENT})
+    def __init__(self, http_client: Optional[HTTPClient] = None):
+        super().__init__(http_client=http_client)
     
     def can_download(self, reference: Reference) -> bool:
         """Check if reference has PubMed info."""
@@ -110,8 +108,7 @@ class PubMedDownloader(BaseDownloader):
                 f"&ids={pmid}&format=json"
             )
             
-            response = self.session.get(url, timeout=self.timeout)
-            response.raise_for_status()
+            response = self.http_client.get(url, timeout=self.timeout, verify=True)
             
             data = response.json()
             if 'records' in data and len(data['records']) > 0:
@@ -139,12 +136,12 @@ class PubMedDownloader(BaseDownloader):
             
             logger.info(f"Downloading from PMC: {pdf_url}")
             
-            response = self.session.get(
+            response = self.http_client.get(
                 pdf_url,
                 timeout=self.timeout,
-                allow_redirects=True
+                allow_redirects=True,
+                verify=True,
             )
-            response.raise_for_status()
             
             content = response.content
             file_size = self._save_pdf(content, output_path)
@@ -163,6 +160,9 @@ class PubMedDownloader(BaseDownloader):
                     error_message="Invalid PDF content"
                 )
         
+        except HTTPClientError as exc:
+            logger.warning("Error downloading from PMC: %s", exc)
+            return None
         except Exception as e:
             logger.warning(f"Error downloading from PMC: {str(e)}")
             return None
@@ -181,8 +181,7 @@ class PubMedDownloader(BaseDownloader):
                 f"db=pubmed&term={query}&rettype=json&retmode=json"
             )
             
-            response = self.session.get(search_url, timeout=self.timeout)
-            response.raise_for_status()
+            response = self.http_client.get(search_url, timeout=self.timeout, verify=True)
             
             data = response.json()
             if 'esearchresult' in data and 'idlist' in data['esearchresult']:

@@ -1,7 +1,7 @@
 """Configuration settings for the reference downloader."""
 
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 
 class Settings:
@@ -16,6 +16,7 @@ class Settings:
     TIMEOUT: int = 30  # seconds
     MAX_RETRIES: int = 3
     RETRY_DELAY: int = 2  # seconds
+    RETRY_BACKOFF_FACTOR: float = 2.0
     
     # Rate limiting
     REQUEST_DELAY: float = 0.5  # seconds between requests
@@ -28,8 +29,13 @@ class Settings:
     PUBMED_API_KEY: Optional[str] = None
     CROSSREF_EMAIL: str = "user@example.com"  # Required by Crossref API
     
-    # User agent
-    USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    # User agents
+    USER_AGENTS: List[str] = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0",
+    ]
+    USER_AGENT: str = USER_AGENTS[0]
     
     # Feature flags
     ENABLE_SCIHUB: bool = True
