@@ -1,6 +1,6 @@
 """Data models for references and download results."""
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field
 
@@ -53,6 +53,7 @@ class Reference(BaseModel):
     # Additional metadata
     publisher: Optional[str] = Field(None, description="Publisher name")
     publication_type: Optional[str] = Field(None, description="Type (journal, conference, book, etc.)")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata (e.g., extraction method)")
     
     def get_output_folder_name(self) -> str:
         """Get the output folder name based on first author and year."""
