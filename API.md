@@ -117,10 +117,34 @@ result = ExtractionResult(
     references: List[Reference] = [],
     total_references: int = 0,
     extraction_errors: List[str] = [],
-)
-```
+    )
+    ```
 
-## Extractor Module
+    ### ExtractionFallbackManager
+
+    Manages fallback extraction strategies for edge cases.
+
+    ```python
+    from src.extractor.fallbacks import ExtractionFallbackManager
+
+    fallback_manager = ExtractionFallbackManager()
+    ```
+
+    **Configuration:**
+    - `FALLBACK_MIN_REFERENCE_THRESHOLD`: Minimum references to trigger fallbacks
+    - `ENABLE_TABLE_FALLBACK`: Enable table-based extraction
+    - `ENABLE_BIBTEX_FALLBACK`: Enable BibTeX parsing fallback
+    - `ENABLE_HTML_STRUCTURE_FALLBACK`: Enable HTML structure analysis fallback
+
+    **Methods:**
+    - `should_trigger_fallbacks(result: ExtractionResult) -> bool`: Check if fallbacks needed
+    - `apply_fallbacks(result, source_text, source_type, pdf_object=None, html_content=None) -> ExtractionResult`: Apply fallback strategies
+    - `_extract_from_tables(pdf_object) -> List[Reference]`: Extract from PDF tables
+    - `_extract_from_bibtex(text) -> List[Reference]`: Parse BibTeX entries
+    - `_extract_from_html_structure(html) -> List[Reference]`: Extract from HTML elements
+    - `_deduplicate_references(references, existing_fingerprints) -> List[Reference]`: Remove duplicates
+
+    ## Extractor Module
 
 ### PDFExtractor
 

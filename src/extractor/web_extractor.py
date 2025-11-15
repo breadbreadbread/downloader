@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from src.models import ExtractionResult, Reference
 from src.extractor.base import BaseExtractor
 from src.extractor.parser import ReferenceParser
+from src.extractor.fallbacks import ExtractionFallbackManager
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ class WebExtractor(BaseExtractor):
     
     def __init__(self):
         self.parser = ReferenceParser()
+        self.fallback_manager = ExtractionFallbackManager()
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": settings.USER_AGENT})
     
@@ -52,7 +54,17 @@ class WebExtractor(BaseExtractor):
             result.references = references
             result.total_references = len(references)
             
-            logger.info(f"Extracted {len(references)} references from {source}")
+            logger.info(f"Primary extraction found {len(references)} references from {source}")
+            
+            # Apply fallback strategies if needed
+            result = self.fallback_manager.apply_fallbacks(
+                result=result,
+                source_text=references_text,
+                source_type='web',
+                html_content=html_text
+            )
+            
+            logger.info(f"Final extraction result: {len(result.references)} references from {source}")
             
         except requests.RequestException as e:
             result.extraction_errors.append(f"Error fetching URL: {str(e)}")
