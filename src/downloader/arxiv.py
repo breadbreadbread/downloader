@@ -1,14 +1,14 @@
 """arXiv, bioRxiv, and chemRxiv downloader."""
 
 import logging
-import requests
+import time
 from pathlib import Path
 from typing import Optional
-import time
 
-from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
-from src.downloader.base import BaseDownloader
 from src.config import settings
+from src.downloader.base import BaseDownloader
+from src.http_client import HTTPClient, HTTPClientError
+from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +16,8 @@ logger = logging.getLogger(__name__)
 class ArxivDownloader(BaseDownloader):
     """Download papers from arXiv, bioRxiv, and chemRxiv."""
     
-    def __init__(self):
-        super().__init__()
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": settings.USER_AGENT})
+    def __init__(self, http_client: Optional[HTTPClient] = None):
+        super().__init__(http_client=http_client)
     
     def can_download(self, reference: Reference) -> bool:
         """Check if reference is from arXiv or related preprint server."""
@@ -89,12 +87,12 @@ class ArxivDownloader(BaseDownloader):
             
             logger.info(f"Downloading from arXiv: {pdf_url}")
             
-            response = self.session.get(
+            response = self.http_client.get(
                 pdf_url,
                 timeout=self.timeout,
-                allow_redirects=True
+                allow_redirects=True,
+                verify=True,
             )
-            response.raise_for_status()
             
             content = response.content
             file_size = self._save_pdf(content, output_path)
@@ -113,6 +111,9 @@ class ArxivDownloader(BaseDownloader):
                     error_message="Invalid PDF content"
                 )
             
+        except HTTPClientError as exc:
+            logger.warning("Error downloading arXiv paper: %s", exc)
+            return None
         except Exception as e:
             logger.warning(f"Error downloading arXiv paper: {str(e)}")
             return None
@@ -153,12 +154,12 @@ class ArxivDownloader(BaseDownloader):
             # Rate limiting for preprint servers
             time.sleep(settings.ARXIV_DELAY)
             
-            response = self.session.get(
+            response = self.http_client.get(
                 url,
                 timeout=self.timeout,
-                allow_redirects=True
+                allow_redirects=True,
+                verify=True,
             )
-            response.raise_for_status()
             
             content = response.content
             file_size = self._save_pdf(content, output_path)
@@ -177,6 +178,9 @@ class ArxivDownloader(BaseDownloader):
                     error_message="Invalid PDF content"
                 )
         
+        except HTTPClientError as exc:
+            logger.warning("Error downloading from preprint URL: %s", exc)
+            return None
         except Exception as e:
             logger.warning(f"Error downloading from preprint URL: {str(e)}")
             return None
