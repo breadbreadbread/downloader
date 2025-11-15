@@ -119,6 +119,9 @@ Configuration can be customized in `src/config.py`. Key settings:
 
 - `TIMEOUT`: HTTP request timeout (default: 30 seconds)
 - `MAX_RETRIES`: Number of retry attempts (default: 3)
+- `RETRY_DELAY`: Base delay between retries in seconds (default: 2)
+- `REQUEST_DELAY`: Delay between requests to respect rate limits (default: 0.5)
+- `USER_AGENT_POOL`: List of User-Agent strings to rotate through (default: 6 browser variants)
 - `ENABLE_SCIHUB`: Enable/disable Sci-Hub access (default: True)
 - `ENABLE_PUBMED`: Enable/disable PubMed access (default: True)
 - `ENABLE_ARXIV`: Enable/disable arXiv access (default: True)
@@ -132,9 +135,21 @@ PUBMED_API_KEY=your_key_here
 CROSSREF_EMAIL=your.email@example.com
 ```
 
+**Advanced: Custom User-Agent Pool**
+You can customize the User-Agent pool in `src/config.py` by modifying `USER_AGENT_POOL`.
+The client will randomly select and rotate through these agents on 403 errors.
+
 ## Architecture
 
 ### Components
+
+- **Network Module** (`src/network/`)
+  - `HTTPClient`: Centralized HTTP client with retry logic and header rotation
+    - Automatic retry on 429, 500, 502, 503, 504, 403 errors
+    - User-Agent rotation from configurable pool
+    - Exponential backoff with respect for Retry-After headers
+    - Desktop browser headers (Accept, Accept-Language, etc.)
+    - Request/response logging at DEBUG level
 
 - **Extractor Module** (`src/extractor/`)
   - `PDFExtractor`: Extract text and references from PDFs with layout awareness
@@ -197,11 +212,16 @@ The application attempts to download papers in the following priority order:
 ## Error Handling
 
 The application handles various error scenarios:
-- Network errors with retry logic
+- **Network errors with robust retry logic**
+  - Automatic retry on 403, 429, 500, 502, 503, 504 status codes
+  - User-Agent rotation on 403 Forbidden errors
+  - Exponential backoff between retry attempts
+  - Respects Retry-After headers from servers
 - Invalid PDF format detection
 - Missing or incomplete reference information
-- Download failures with detailed error messages
-- Automatic fallback to alternative sources
+- Download failures with detailed error messages (status code + response snippet)
+- Automatic fallback to alternative download sources
+- Sanitized logging to avoid leaking sensitive data (tokens, keys)
 
 ## Performance
 
@@ -274,6 +294,28 @@ pip-audit
 - Check your internet connection
 - Verify DOI format if using DOI search
 - Try disabling problematic sources in settings
+
+### 403 Forbidden errors on --url mode
+The application now includes robust retry logic with User-Agent rotation:
+- Automatic retry with fresh browser headers on 403 errors
+- Rotating User-Agent pool to mimic different browsers
+- Exponential backoff with configurable retries
+
+If you still get 403 errors:
+- Some websites may block automated access entirely
+- Try copying the page content manually
+- Check if the site requires authentication
+
+**Debug mode for HTTP requests:**
+```bash
+# Enable DEBUG logging to see detailed HTTP diagnostics
+python -m src.main --url https://example.com --log-level DEBUG
+```
+
+You'll see:
+- Request attempts with User-Agent rotation
+- Status codes and retry attempts
+- Final error messages with response snippets
 
 ### Very slow downloads
 - Network latency is normal
