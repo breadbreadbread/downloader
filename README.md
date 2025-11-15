@@ -5,7 +5,9 @@ A comprehensive Python application that extracts bibliographic references from P
 ## Features
 
 - **Reference Extraction**
-  - Extract references from PDF documents using advanced text parsing
+  - Extract references from PDF documents using layout-aware parsing
+  - Support for multi-column PDF layouts (1-3 columns)
+  - Intelligent filtering of figure captions, tables, and non-reference content
   - Extract references from web pages
   - Support for multiple reference formats (Harvard, APA, Chicago, etc.)
   - Identification and extraction of DOI, URLs, PMID, and arXiv IDs
@@ -92,8 +94,11 @@ python -m src.main --pdf /path/to/paper.pdf --skip-download
 --url URL               URL of web page to extract references from
 --output DIR            Output directory for downloaded papers (default: ./downloads)
 --log-level LEVEL       Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)
+                        Use DEBUG for detailed extraction logging
 --skip-download         Only extract references, don't download papers
 ```
+
+**Note:** Use `--log-level DEBUG` to see detailed information about the PDF extraction process, including column detection, reference section identification, and filtering decisions.
 
 ## Output Structure
 
@@ -132,7 +137,8 @@ CROSSREF_EMAIL=your.email@example.com
 ### Components
 
 - **Extractor Module** (`src/extractor/`)
-  - `PDFExtractor`: Extract text and references from PDFs
+  - `PDFExtractor`: Extract text and references from PDFs with layout awareness
+  - `LayoutAwareExtractor`: Layout-aware PDF parsing with column detection
   - `WebExtractor`: Extract content from web pages
   - `ReferenceParser`: Parse raw reference text into structured data
 
