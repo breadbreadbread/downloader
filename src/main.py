@@ -8,6 +8,7 @@ from pathlib import Path
 from src.extractor import PDFExtractor, WebExtractor
 from src.downloader import DownloadCoordinator
 from src.report import ReportGenerator
+from src.models import DownloadSummary, DownloadResult, DownloadStatus, DownloadSource
 from src.utils import setup_logging
 from src.config import settings
 
@@ -111,11 +112,39 @@ Examples:
         
         if extraction_result.total_references == 0:
             logger.warning("No references found. Exiting.")
+            if args.skip_download:
+                summary = DownloadSummary()
+                summary.calculate_stats()
+                report_gen = ReportGenerator(output_dir)
+                report_gen.generate_reports(summary)
             return 0
         
         # Download papers
         if args.skip_download:
             logger.info("Skipping download phase (--skip-download specified)")
+            summary = DownloadSummary()
+            for reference in extraction_result.references:
+                folder_name = reference.get_output_folder_name()
+                ref_dir = output_dir / folder_name
+                ref_dir.mkdir(parents=True, exist_ok=True)
+                summary.results.append(
+                    DownloadResult(
+                        reference=reference,
+                        status=DownloadStatus.SKIPPED,
+                        source=DownloadSource.UNKNOWN,
+                        file_path=None,
+                        error_message="Download skipped via --skip-download flag"
+                    )
+                )
+            summary.calculate_stats()
+        
+            logger.info("=" * 80)
+            logger.info("PHASE 3: GENERATING REPORTS")
+            logger.info("=" * 80)
+        
+            report_gen = ReportGenerator(output_dir)
+            report_gen.generate_reports(summary)
+            logger.info("Reports generated in %s", output_dir)
             return 0
         
         logger.info("=" * 80)
