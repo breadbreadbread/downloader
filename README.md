@@ -29,7 +29,7 @@ A comprehensive Python application that extracts bibliographic references from P
 ## Installation
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.8+ (recommended: 3.10+)
 - pip
 
 ### Setup
@@ -44,7 +44,31 @@ pip install -r requirements.txt
 
 # Install package in development mode
 pip install -e .
+
+# (Optional) Install development/testing dependencies
+pip install -r requirements-dev.txt
+# Or: pip install -e .[dev]
 ```
+
+### Dependencies
+
+The project uses carefully versioned dependencies to ensure compatibility and security:
+
+**Core Runtime Dependencies:**
+- `requests>=2.31.0,<2.33.0` - HTTP requests
+- `pdfplumber>=0.10.0,<0.12.0` - PDF extraction
+- `beautifulsoup4>=4.12.0,<4.15.0` - HTML parsing
+- `lxml>=4.9.0,<4.10.0` - XML/HTML backend
+- `pydantic>=2.0.0,<2.13.0` - Data validation
+- `reportlab>=4.0.0,<4.5.0` - PDF generation
+- `Pillow>=10.0.0,<11.0.0` - Image support
+
+**Development Dependencies (optional):**
+- pytest, black, isort, flake8, mypy, pylint for development
+- pip-audit for security scanning
+- responses for HTTP mocking in tests
+
+See `requirements.txt` and `requirements-dev.txt` for complete lists.
 
 ## Usage
 
@@ -209,6 +233,32 @@ For issues, questions, or suggestions:
 
 ## Troubleshooting
 
+### Dependency Issues
+
+**"No module named requests/pdfplumber/..."**
+```bash
+# Reinstall dependencies
+pip install -r requirements.txt
+
+# Or install in a clean virtual environment
+python -m venv env
+source env/bin/activate  # On Windows: env\Scripts\activate
+pip install -r requirements.txt
+```
+
+**Version conflict errors**
+```bash
+# Check for dependency issues
+pip check
+
+# Verify versions match requirements
+pip list | grep -E "requests|pdfplumber|pydantic"
+
+# Run security audit
+pip install pip-audit
+pip-audit
+```
+
 ### No references found
 - Ensure the PDF/website has a references section
 - Try a different source
@@ -223,6 +273,13 @@ For issues, questions, or suggestions:
 - Network latency is normal
 - Sci-Hub mirrors may be slower
 - Consider reducing rate limiting if you own the source
+
+### PDF Processing Issues
+**pdfminer.six vulnerability warning**
+- The application uses pdfplumber which depends on pdfminer.six
+- There is a known vulnerability (GHSA-f83h-ghpp-7wcc) in insecure deserialization
+- **Mitigation**: Only process trusted PDF files from reliable sources
+- This vulnerability requires write access to CMap directories (unlikely in normal use)
 
 ## API Dependencies
 
