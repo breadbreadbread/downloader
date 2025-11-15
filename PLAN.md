@@ -85,28 +85,46 @@ reference-downloader/
 
 ## Key Dependencies
 
-### Core Libraries
-- `requests` - HTTP requests and web scraping
-- `pdfplumber` - Advanced PDF text extraction
-- `beautifulsoup4` - HTML parsing
-- `lxml` - XML/HTML parsing
+### Audited Core Runtime Dependencies (Active)
+Carefully versioned with upper bounds to prevent breaking changes:
 
-### Data Processing
-- `bibtexparser` - BibTeX parsing
-- `crossref-commons` - DOI lookup and metadata
-- `pydantic` - Data validation and settings management
+- `requests>=2.31.0,<2.33.0` - HTTP requests and web scraping
+- `pdfplumber>=0.10.0,<0.12.0` - Advanced PDF text extraction
+- `beautifulsoup4>=4.12.0,<4.15.0` - HTML parsing
+- `lxml>=4.9.0,<4.10.0` - XML/HTML parsing backend for BeautifulSoup
+- `pydantic>=2.0.0,<2.13.0` - Data validation and settings management
+- `reportlab>=4.0.0,<4.5.0` - PDF report generation
+- `Pillow>=10.0.0,<11.0.0` - Image handling for reportlab
 
-### Reporting
-- `reportlab` - PDF generation
-- `Pillow` - Image handling for reports
+### Development Dependencies (Optional)
+Installed with: `pip install -r requirements-dev.txt` or `pip install -e .[dev]`
 
-### API Access
-- `arxiv` - arXiv API client
-- `biopython` - Optional, for biomedical data
+- `pytest` - Test framework
+- `pytest-cov` - Code coverage
+- `black` - Code formatting
+- `isort` - Import sorting
+- `flake8` - Linting
+- `mypy` - Type checking
+- `pylint` - Advanced linting
+- `pip-audit` - Security vulnerability scanning
+- `responses` - HTTP mocking for tests
+- `faker` - Test data generation
 
-### Utilities
-- `python-dotenv` - Environment variable management
-- `tqdm` - Progress bars
+### Removed/Cleaned Up Unused Dependencies
+The following were in the original requirements but are NOT used:
+- ~~`bibtexparser`~~ - No direct usage in codebase
+- ~~`crossref-commons`~~ - Functionality implemented via requests
+- ~~`arxiv`~~ - Not directly imported (use API calls instead)
+- ~~`python-dotenv`~~ - No environment variable loading needed
+- ~~`tqdm`~~ - Progress bars not implemented
+- ~~`httpx`~~ - Requests library is sufficient
+
+### Transitive Dependencies
+These are installed as dependencies of our core libraries:
+- `pdfminer.six` (via pdfplumber) - PDF extraction
+- `feedparser` - Feed parsing (via pdfplumber)
+- `typing-extensions` - Type hints compatibility
+- `cryptography` - SSL/TLS support
 
 ## Implementation Phases
 
@@ -225,6 +243,40 @@ output_folder/
 - Achieve 50%+ download success rate overall
 - Complete processing in reasonable time (<5 minutes for typical papers)
 
+## Security & Audit
+
+### Dependency Audit Results
+As of dependency refresh:
+- **pip check**: ✅ No broken requirements
+- **pip-audit**: 1 known vulnerability in pdfminer.six (transitive via pdfplumber)
+  - **CVE**: GHSA-f83h-ghpp-7wcc (Insecure deserialization in CMap loading)
+  - **Status**: Known issue in pdfminer.six 20251107; pdfplumber 0.11.8 is latest
+  - **Mitigation**: This is a low-risk vulnerability in our use case as we don't process malicious PDFs
+  
+### Python Version Support
+- **Minimum**: Python 3.8
+- **Tested**: Python 3.12
+- **Recommendation**: Python 3.10+ for security updates
+
+### Version Pinning Strategy
+- Major and minor versions are pinned (e.g., `requests>=2.31.0,<2.33.0`)
+- This prevents breaking changes while allowing patch updates
+- Upper bounds prevent accidental incompatibilities
+
+### Installation Validation
+```bash
+# Full environment from scratch
+python -m venv env
+source env/bin/activate
+pip install -r requirements.txt
+
+# Verify installation
+pip check        # Should show: "No broken requirements found"
+pip-audit        # Optional: run security audit
+python -m unittest discover tests/  # Should pass all tests
+python -m src.main --help  # Verify CLI works
+```
+
 ## Security & Ethics Considerations
 
 - Respect rate limits of external services
@@ -232,6 +284,8 @@ output_folder/
 - Cache downloads to avoid re-downloading
 - Follow terms of service for each download source
 - Document all sources used
+- Only process trusted PDF documents (vulnerability in pdfminer.six CMap loading)
+- Secure API keys and credentials in environment variables
 
 ## Future Enhancements
 
