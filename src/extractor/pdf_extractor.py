@@ -60,12 +60,12 @@ class PDFExtractor(BaseExtractor):
                 logger.info(f"Primary extraction found {len(references)} references from {pdf_path}")
                 
                 # Apply fallback strategies if needed
-                result = self.fallback_manager.apply_fallbacks(
-                    result=result,
-                    source_text=text,
-                    source_type='pdf',
-                    pdf_object=pdf
-                )
+                    result = self.fallback_manager.apply_fallbacks(
+                        result=result,
+                        source_text=text,
+                        source_type='pdf',
+                        pdf_object=pdf
+                    )
                 
                 logger.info(f"Final extraction result: {len(result.references)} references from {pdf_path}")
                 
