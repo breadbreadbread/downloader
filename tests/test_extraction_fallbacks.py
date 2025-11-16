@@ -7,9 +7,9 @@ import logging
 from pathlib import Path
 
 from src.extractor.pdf_extractor import PDFExtractor
-from src.extractor.bibtex_parser import BibTeXParser
-from src.extractor.pdf.table_extractor import TableExtractor
-from src.extractor.html_fallback import HTMLFallbackExtractor
+from src.extractor.fallbacks.bibtex_parser import BibTeXParser
+from src.extractor.fallbacks.table_extractor import TableExtractor
+from src.extractor.fallbacks.html_fallback import HTMLFallbackExtractor
 from tests.fixtures.fixture_generator import (
     generate_pdf_with_table_references,
     generate_pdf_with_bibtex,
