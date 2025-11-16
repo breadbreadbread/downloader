@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 """
 Performance measurement and baseline establishment for validation.
+
+Usage:
+    python scripts/measure_performance.py
+
+Dependencies:
+    - psutil (part of requirements-dev.txt)
+    - Core application modules (PDFExtractor, DownloadCoordinator)
+
+This script measures extraction and download coordinator performance using
+existing synthetic fixtures. Results are stored under
+`docs/validation-results/performance/baseline.json`.
 """
 
 import time

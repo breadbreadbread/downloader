@@ -158,6 +158,25 @@ Enable debug mode to see the retry attempts:
 python -m src.main --url https://example.com --log-level DEBUG
 ```
 
+## Validation & Testing
+
+Need to verify a change quickly?
+
+1. Generate synthetic PDFs (optional but recommended):
+   ```bash
+   python scripts/generate_test_pdfs.py
+   ```
+2. Run the fast regression suite:
+   ```bash
+   pytest
+   ```
+3. Capture performance metrics when extractor or HTTP logic changes:
+   ```bash
+   python scripts/measure_performance.py
+   ```
+
+Full guidance lives in the validation plan: [docs/testing/validation_plan.md](docs/testing/validation_plan.md).
+
 ## Next Steps
 
 - Read [API.md](API.md) for detailed API documentation

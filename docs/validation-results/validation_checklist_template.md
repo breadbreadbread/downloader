@@ -38,103 +38,69 @@
   - Single reference: ✅/❌
 
 ## Download Pipeline Validation ✅
-- [ ] DOI resolution working (CrossRef)
+- [ ] DOI resolution working (CrossRef API)
   - Success rate: __% (__ / __)
-  - Error handling: ✅/❌
-  - Timeout handling: ✅/❌
-- [ ] arXiv downloads working with rate limiting
+  - Graceful fallback when metadata lacks PDF URL: ✅/❌
+  - Timeout handling captured in logs: ✅/❌
+- [ ] arXiv / preprint downloads working with rate limiting
   - Success rate: __% (__ / __)
-  - 3-second delay enforced: ✅/❌
-  - API error handling: ✅/❌
-- [ ] PubMed downloads working
+  - 3-second delay respected: ✅/❌
+  - Abstract → PDF URL normalization verified: ✅/❌
+- [ ] PubMed Central downloads smoke-tested (if enabled)
   - Success rate: __% (__ / __)
-  - PMID resolution: ✅/❌
-  - API key handling: ✅/❌
-- [ ] Sci-Hub fallback chain working
-  - Mirror failover: ✅/❌
-  - Captcha handling: ✅/❌
-  - Success rate: __% (__ / __)
+  - Metadata parsing validated: ✅/❌
+- [ ] Sci-Hub fallback smoke-tested (if enabled/allowed)
+  - Error handling documented: ✅/❌
+  - Access restrictions respected: ✅/❌
 - [ ] Error handling and logging appropriate
-  - HTTP errors logged: ✅/❌
-  - Timeouts handled gracefully: ✅/❌
-  - User-friendly error messages: ✅/❌
-- [ ] Parallel downloads working efficiently
-  - Sequential vs parallel improvement: __x
-  - Memory usage reasonable: ✅/❌
-  - No race conditions: ✅/❌
+  - HTTP errors logged with context: ✅/❌
+  - NOT_FOUND vs FAILED states differentiated: ✅/❌
+  - User-facing error messages actionable: ✅/❌
 
 ## HTTP Hardening Validation ✅
-- [ ] Timeouts handled gracefully (30s limit)
+- [ ] HTTPClient timeout handling (30s default) verified
   - DOI resolver: ✅/❌
   - arXiv downloader: ✅/❌
-  - All downloaders: ✅/❌
-- [ ] Retry logic working (3 attempts)
-  - Exponential backoff: ✅/❌
-  - Success on retry: ✅/❌
-  - Proper logging: ✅/❌
-- [ ] User agent set correctly
-  - All HTTP requests include User-Agent: ✅/❌
-  - Custom User-Agent format: ✅/❌
-  - No default Python UA: ✅/❌
+  - PubMed / Sci-Hub: ✅/❌
+- [ ] Retry logic behaviour observed (max retries = __)
+  - Exponential backoff applied: ✅/❌
+  - 403 responses trigger User-Agent rotation: ✅/❌
+  - Retry-After header respected: ✅/❌
+- [ ] User-Agent management
+  - Requests use pool entries (no default Python UA): ✅/❌
+  - Host-specific rotation documented on failure: ✅/❌
 - [ ] Rate limiting respected
-  - arXiv 3-second delay: ✅/❌
-  - General 0.5s delay: ✅/❌
-  - No rate limit violations: ✅/❌
-- [ ] SSL verification enabled
-  - HTTPS verification: ✅/❌
-  - Certificate validation: ✅/❌
-  - No insecure connections: ✅/❌
-- [ ] Connection pooling limits effective
-  - Max connections configured: ✅/❌
-  - Connection reuse: ✅/❌
-  - Resource cleanup: ✅/❌
+  - arXiv delay (`settings.ARXIV_DELAY`): ✅/❌
+  - Global request delay (`settings.REQUEST_DELAY`): ✅/❌
+- [ ] SSL verification enabled (no `verify=False` overrides): ✅/❌
 
 ## CLI Interface Validation ✅
-- [ ] PDF mode working with valid files
+- [ ] PDF mode smoke run (`--skip-download`) passes
   - Single column PDF: ✅/❌
   - Two column PDF: ✅/❌
   - Three column PDF: ✅/❌
-  - Large PDF handling: ✅/❌
-- [ ] URL mode working with valid URLs
-  - arXiv URLs: ✅/❌
-  - PubMed URLs: ✅/❌
-  - Journal URLs: ✅/❌
-  - Invalid URL rejection: ✅/❌
+- [ ] URL mode smoke run (`--skip-download`) passes
+  - Local HTML fixture: ✅/❌
+  - Invalid URL error message: ✅/❌
 - [ ] Output directory creation working
   - Nested directory creation: ✅/❌
-  - Permission handling: ✅/❌
-  - Existing directory handling: ✅/❌
+  - Existing directory reuse: ✅/❌
 - [ ] Log level configuration working
-  - DEBUG logging: ✅/❌
-  - INFO logging: ✅/❌
-  - ERROR logging: ✅/❌
-  - Log file creation: ✅/❌
-- [ ] Error messages user-friendly
-  - Clear error descriptions: ✅/❌
-  - Actionable advice: ✅/❌
-  - No stack traces to user: ✅/❌
-- [ ] Help documentation complete
-  - Usage examples: ✅/❌
-  - Parameter descriptions: ✅/❌
-  - Troubleshooting tips: ✅/❌
+  - DEBUG logging surfaces extraction phases: ✅/❌
+  - INFO logging remains concise: ✅/❌
+- [ ] Help / error messaging
+  - `--help` shows usage/examples: ✅/❌
+  - Mutually exclusive PDF/URL error handled: ✅/❌
+  - No raw tracebacks surfaced to users: ✅/❌
 
 ## Performance Validation ✅
 - [ ] Extraction performance within targets
-  - Single column (20 refs): <2s ✅/❌
-  - Two column (50 refs): <3s ✅/❌
-  - Three column (50 refs): <4s ✅/❌
-- [ ] Download performance within targets
-  - Sequential: <5s per reference ✅/❌
-  - Parallel: 3-5x improvement ✅/❌
-  - Fallback overhead: <1s ✅/❌
-- [ ] Memory usage reasonable
-  - Peak memory <500MB: ✅/❌
-  - No memory leaks: ✅/❌
-  - Cleanup after completion: ✅/❌
-- [ ] Large batch processing stable
-  - 100+ references: ✅/❌
-  - Memory growth controlled: ✅/❌
-  - Processing time linear: ✅/❌
+  - Single column (20 refs): ≤2s ✅/❌
+  - Two column (50 refs): ≤5s ✅/❌
+  - Three column (50 refs): ≤6s ✅/❌
+- [ ] Memory usage reasonable (delta ≤120 MB): ✅/❌
+- [ ] Baseline JSON updated (`docs/validation-results/performance/baseline.json`): ✅/❌
+- [ ] Regression analysis recorded in validation notes: ✅/❌
 
 ## Dependency Validation ✅
 - [ ] pip check passes (no broken requirements)

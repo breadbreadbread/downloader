@@ -8,6 +8,7 @@ from pathlib import Path
 from src.downloader.doi_resolver import DOIResolver
 from src.downloader.arxiv import ArxivDownloader
 from src.models import Reference, DownloadStatus
+from src.network.http_client import HTTPClient
 
 
 class TestHTTPHardening(unittest.TestCase):
@@ -30,7 +31,7 @@ class TestHTTPHardening(unittest.TestCase):
     
     def test_timeout_handling_doi_resolver(self):
         """Test DOI resolver handles timeouts gracefully."""
-        with patch('requests.Session.get', side_effect=requests.Timeout()):
+        with patch.object(self.doi_resolver.http_client, 'get', side_effect=requests.Timeout()):
             result = self.doi_resolver.download(
                 self.doi_reference, 
                 Path("./test_output.pdf")
@@ -43,7 +44,7 @@ class TestHTTPHardening(unittest.TestCase):
     
     def test_timeout_handling_arxiv(self):
         """Test arXiv downloader handles timeouts gracefully."""
-        with patch('requests.Session.get', side_effect=requests.Timeout()):
+        with patch.object(self.arxiv_downloader.http_client, 'get', side_effect=requests.Timeout()):
             result = self.arxiv_downloader.download(
                 self.arxiv_reference,
                 Path("./test_output.pdf")
@@ -56,7 +57,7 @@ class TestHTTPHardening(unittest.TestCase):
     
     def test_connection_error_handling(self):
         """Test connection errors are handled gracefully."""
-        with patch('requests.Session.get', side_effect=requests.ConnectionError()):
+        with patch.object(self.doi_resolver.http_client, 'get', side_effect=requests.ConnectionError()):
             result = self.doi_resolver.download(
                 self.doi_reference,
                 Path("./test_output.pdf")
@@ -68,11 +69,7 @@ class TestHTTPHardening(unittest.TestCase):
     
     def test_http_403_handling(self):
         """Test HTTP 403 Forbidden responses."""
-        mock_response = MagicMock()
-        mock_response.status_code = 403
-        mock_response.raise_for_status.side_effect = requests.HTTPError()
-        
-        with patch('requests.Session.get', return_value=mock_response):
+        with patch.object(self.doi_resolver.http_client, 'get', side_effect=requests.RequestException("403")):
             result = self.doi_resolver.download(
                 self.doi_reference,
                 Path("./test_output.pdf")
@@ -84,33 +81,39 @@ class TestHTTPHardening(unittest.TestCase):
     
     def test_user_agent_header_set(self):
         """Test User-Agent header is properly set."""
-        # Check that the session has User-Agent set during initialization
-        self.assertIn("User-Agent", self.doi_resolver.session.headers)
-        self.assertNotEqual(self.doi_resolver.session.headers["User-Agent"], "")
+        client = HTTPClient()
+        user_agent = client._get_user_agent_for_host("example.com")
+        default_headers = client._get_default_headers(user_agent)
         
-        # Same for arXiv downloader
-        self.assertIn("User-Agent", self.arxiv_downloader.session.headers)
-        self.assertNotEqual(self.arxiv_downloader.session.headers["User-Agent"], "")
+        self.assertIn("User-Agent", default_headers)
+        self.assertTrue(default_headers["User-Agent"])  # Non-empty user agent
     
     def test_ssl_verification_enabled(self):
         """Test SSL verification is enabled by default."""
-        mock_response = MagicMock()
-        mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = requests.HTTPError()
+        capture_kwargs = {}
         
-        with patch('requests.Session.get', return_value=mock_response) as mock_get:
-            self.doi_resolver.download(self.doi_reference, Path("./test.pdf"))
+        class DummySession:
+            def __init__(self):
+                self.headers = {"User-Agent": "dummy"}
             
-            # Verify SSL verification is enabled (default behavior)
-            call_args = mock_get.call_args
-            # If verify is not specified, it defaults to True
-            verify_value = call_args[1].get('verify', True)
-            self.assertTrue(verify_value)
+            def get(self, *args, **kwargs):
+                capture_kwargs.update(kwargs)
+                response = MagicMock()
+                response.status_code = 200
+                response.raise_for_status.return_value = None
+                response.content = b"%PDF"
+                return response
+        
+        with patch.object(self.doi_resolver.http_client, '_create_session', return_value=DummySession()):
+            self.doi_resolver.http_client.get("https://example.com/test.pdf")
+        
+        # If verify isn't provided, requests defaults to True
+        self.assertNotEqual(capture_kwargs.get('verify', True), False)
     
     def test_session_timeout_configuration(self):
         """Test session timeout is configured."""
-        self.assertEqual(self.doi_resolver.timeout, 30)
-        self.assertEqual(self.arxiv_downloader.timeout, 30)
+        self.assertEqual(self.doi_resolver.http_client.timeout, 30)
+        self.assertEqual(self.arxiv_downloader.http_client.timeout, 30)
     
     def test_arxiv_rate_limiting_configuration(self):
         """Test arXiv rate limiting is configured in settings."""
