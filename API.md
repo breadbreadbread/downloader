@@ -120,6 +120,93 @@ result = ExtractionResult(
 )
 ```
 
+## Network Module
+
+### HTTPClient
+
+Centralized HTTP client with retry logic and User-Agent rotation.
+
+```python
+from src.network import HTTPClient
+
+# Create HTTP client
+client = HTTPClient(timeout=30)
+
+# Perform GET request with automatic retry
+response = client.get("https://example.com/page")
+print(response.status_code)
+print(response.text)
+
+# With custom headers
+response = client.get(
+    "https://api.example.com/endpoint",
+    headers={"X-API-Key": "your-key"}
+)
+
+# POST request
+response = client.post(
+    "https://api.example.com/submit",
+    json={"key": "value"}
+)
+
+# Use as context manager
+with HTTPClient() as client:
+    response = client.get("https://example.com")
+    print(response.text)
+```
+
+**Features:**
+
+- **Automatic retry logic**: Retries on 403, 429, 500, 502, 503, 504 errors
+- **User-Agent rotation**: Rotates through pool of browser User-Agents on 403 errors
+- **Exponential backoff**: Increases delay between retries
+- **Browser headers**: Sends realistic browser headers (Accept, Accept-Language, etc.)
+- **Retry-After respect**: Honors Retry-After headers from servers
+- **Debug logging**: Logs request attempts and responses at DEBUG level
+
+**Parameters:**
+
+- `timeout` (int, optional): Request timeout in seconds (defaults to `settings.TIMEOUT`)
+
+**Methods:**
+
+- `get(url, headers=None, allow_redirects=True, stream=False, **kwargs) -> requests.Response`: 
+  - Perform GET request with retry logic
+  - Automatically rotates User-Agent on 403 errors
+  - Raises `requests.RequestException` on failure after all retries
+
+- `post(url, data=None, json=None, headers=None, **kwargs) -> requests.Response`:
+  - Perform POST request
+  - Raises `requests.RequestException` on failure
+
+- `close()`: Close the session (automatically called when used as context manager)
+
+**Configuration (in `src/config.py`):**
+
+- `MAX_RETRIES`: Number of retry attempts (default: 3)
+- `RETRY_DELAY`: Base delay between retries in seconds (default: 2)
+- `REQUEST_DELAY`: Delay between requests (default: 0.5)
+- `USER_AGENT_POOL`: List of User-Agent strings to rotate (default: 6 browser variants)
+
+**Example with 403 recovery:**
+
+```python
+from src.network import HTTPClient
+import logging
+
+# Enable debug logging to see retry attempts
+logging.basicConfig(level=logging.DEBUG)
+
+client = HTTPClient()
+
+# This will automatically retry with fresh User-Agent if 403 is received
+try:
+    response = client.get("https://example.com/protected-page")
+    print("Success!", response.status_code)
+except Exception as e:
+    print(f"Failed after retries: {e}")
+```
+
 ## Extractor Module
 
 ### PDFExtractor

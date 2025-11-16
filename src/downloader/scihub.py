@@ -10,6 +10,7 @@ import time
 from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
 from src.downloader.base import BaseDownloader
 from src.config import settings
+from src.network.http_client import HTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,7 @@ class SciHubDownloader(BaseDownloader):
     
     def __init__(self):
         super().__init__()
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": settings.USER_AGENT})
+        self.http_client = HTTPClient()
         self.scihub_urls = settings.SCIHUB_URLS
     
     def can_download(self, reference: Reference) -> bool:
@@ -89,12 +89,10 @@ class SciHubDownloader(BaseDownloader):
             search_url = f"{scihub_url}/?q={query}"
             logger.info(f"Searching Sci-Hub mirror {scihub_url} for: {query}")
             
-            response = self.session.get(
+            response = self.http_client.get(
                 search_url,
-                timeout=self.timeout,
                 allow_redirects=True
             )
-            response.raise_for_status()
             
             # Parse response to find PDF link
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -156,12 +154,10 @@ class SciHubDownloader(BaseDownloader):
     ) -> Optional[DownloadResult]:
         """Download PDF from URL."""
         try:
-            response = self.session.get(
+            response = self.http_client.get(
                 pdf_url,
-                timeout=self.timeout,
                 allow_redirects=True
             )
-            response.raise_for_status()
             
             content = response.content
             file_size = self._save_pdf(content, output_path)

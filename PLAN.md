@@ -100,7 +100,7 @@ Carefully versioned with upper bounds to prevent breaking changes:
 Installed with: `pip install -r requirements-dev.txt` or `pip install -e .[dev]`
 
 - `pytest` - Test framework
-- `pytest-cov` - Code coverage
+- `pytest-cov` - Code coverage with 80% enforcement
 - `black` - Code formatting
 - `isort` - Import sorting
 - `flake8` - Linting

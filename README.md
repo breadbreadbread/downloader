@@ -67,6 +67,7 @@ The project uses carefully versioned dependencies to ensure compatibility and se
 
 **Development Dependencies (optional):**
 - pytest, black, isort, flake8, mypy, pylint for development
+- pytest-cov for coverage reporting and enforcement
 - pip-audit for security scanning
 - responses for HTTP mocking in tests
 
@@ -119,6 +120,9 @@ Configuration can be customized in `src/config.py`. Key settings:
 
 - `TIMEOUT`: HTTP request timeout (default: 30 seconds)
 - `MAX_RETRIES`: Number of retry attempts (default: 3)
+- `RETRY_DELAY`: Base delay between retries in seconds (default: 2)
+- `REQUEST_DELAY`: Delay between requests to respect rate limits (default: 0.5)
+- `USER_AGENT_POOL`: List of User-Agent strings to rotate through (default: 6 browser variants)
 - `ENABLE_SCIHUB`: Enable/disable Sci-Hub access (default: True)
 - `ENABLE_PUBMED`: Enable/disable PubMed access (default: True)
 - `ENABLE_ARXIV`: Enable/disable arXiv access (default: True)
@@ -132,9 +136,21 @@ PUBMED_API_KEY=your_key_here
 CROSSREF_EMAIL=your.email@example.com
 ```
 
+**Advanced: Custom User-Agent Pool**
+You can customize the User-Agent pool in `src/config.py` by modifying `USER_AGENT_POOL`.
+The client will randomly select and rotate through these agents on 403 errors.
+
 ## Architecture
 
 ### Components
+
+- **Network Module** (`src/network/`)
+  - `HTTPClient`: Centralized HTTP client with retry logic and header rotation
+    - Automatic retry on 429, 500, 502, 503, 504, 403 errors
+    - User-Agent rotation from configurable pool
+    - Exponential backoff with respect for Retry-After headers
+    - Desktop browser headers (Accept, Accept-Language, etc.)
+    - Request/response logging at DEBUG level
 
 - **Extractor Module** (`src/extractor/`)
   - `PDFExtractor`: Extract text and references from PDFs with layout awareness
@@ -197,11 +213,16 @@ The application attempts to download papers in the following priority order:
 ## Error Handling
 
 The application handles various error scenarios:
-- Network errors with retry logic
+- **Network errors with robust retry logic**
+  - Automatic retry on 403, 429, 500, 502, 503, 504 status codes
+  - User-Agent rotation on 403 Forbidden errors
+  - Exponential backoff between retry attempts
+  - Respects Retry-After headers from servers
 - Invalid PDF format detection
 - Missing or incomplete reference information
-- Download failures with detailed error messages
-- Automatic fallback to alternative sources
+- Download failures with detailed error messages (status code + response snippet)
+- Automatic fallback to alternative download sources
+- Sanitized logging to avoid leaking sensitive data (tokens, keys)
 
 ## Performance
 
@@ -218,9 +239,129 @@ Typical performance on a modern system:
 - Sci-Hub access depends on your jurisdiction's regulations
 - Citation of papers and sources is encouraged
 
+## Development Workflow
+
+This project includes comprehensive automation for dependency management, testing, and quality assurance.
+
+### Quick Start for Developers
+
+```bash
+# Install all dependencies (including dev tools)
+make install-dev
+
+# Run the full validation suite (recommended before commits)
+make validate
+
+# Run individual checks
+make test-coverage    # Tests with 80% coverage enforcement
+make security-check   # pip check + pip-audit
+make lint            # Code quality checks
+```
+
+### Available Make Commands
+
+| Command | Description |
+|---------|-------------|
+| `make install` | Install runtime dependencies only |
+| `make install-dev` | Install all dependencies including dev tools |
+| `make test` | Run unit tests |
+| `make test-coverage` | Run tests with coverage (enforces 80% minimum) |
+| `make validate` | Run full validation (pip check + pip-audit + coverage) |
+| `make security-check` | Run security checks only (pip check + pip-audit) |
+| `make lint` | Run linting tools (black, isort, flake8, mypy) |
+| `make format` | Format code (black, isort) |
+| `make clean` | Clean temporary files and artifacts |
+| `make ci` | Run full CI pipeline locally |
+
+### Dependency Validation
+
+The project includes automated dependency validation that checks:
+
+1. **pip check** - Ensures no broken requirements or version conflicts
+2. **pip-audit** - Scans for known security vulnerabilities
+   - Automatically allows the known pdfminer.six vulnerability (GHSA-f83h-ghpp-7wcc)
+   - Fails on any unapproved vulnerabilities
+3. **Coverage** - Enforces 80% minimum test coverage
+
+```bash
+# Run validation manually
+python scripts/validate_dependencies.py --coverage --verbose
+
+# Or use the Makefile target
+make validate
+```
+
+### Test Coverage
+
+- **Minimum requirement**: 80% line coverage
+- **Reports**: Generated in XML (for CI) and terminal formats
+- **Configuration**: See `pytest.ini` for settings
+
+```bash
+# Run coverage check
+pytest --cov=src --cov-report=xml --cov-fail-under=80
+
+# Or use the Makefile target
+make test-coverage
+```
+
+### Security Auditing
+
+```bash
+# Quick security check
+pip-audit
+
+# Detailed validation with allowlist handling
+python scripts/validate_dependencies.py --verbose
+```
+
+### CI/CD Integration
+
+The project includes a GitHub Actions workflow (`.github/workflows/ci.yml`) that:
+
+- Tests on Python 3.8 (minimum) and 3.12 (current)
+- Runs linting, formatting checks, and security validation
+- Enforces 80% test coverage
+- Uploads coverage reports to Codecov
+- Fails builds on dependency conflicts or unapproved vulnerabilities
+- Comments pull requests with validation results
+
+### Validation Results
+
+Validation results are saved to `validation-results.json` for CI/CD integration:
+
+```json
+{
+  "pip_check": {
+    "status": "passed",
+    "output": "No broken requirements found",
+    "error": ""
+  },
+  "pip_audit": {
+    "status": "passed_with_allowed",
+    "vulnerabilities": [...],
+    "output": "",
+    "error": ""
+  },
+  "coverage": {
+    "status": "passed",
+    "percentage": 85.2,
+    "output": "",
+    "error": ""
+  }
+}
+```
+
 ## Contributing
 
-Contributions are welcome! Areas for improvement:
+Contributions are welcome! Please ensure:
+
+1. **Code Quality**: Run `make lint` and `make format` before submitting
+2. **Tests**: Maintain >80% test coverage (`make test-coverage`)
+3. **Dependencies**: Run `make validate` to check for security issues
+4. **Documentation**: Update relevant documentation
+
+Areas for improvement:
 - Additional download sources
 - Better reference parsing
 - Performance optimization
@@ -274,6 +415,28 @@ pip-audit
 - Check your internet connection
 - Verify DOI format if using DOI search
 - Try disabling problematic sources in settings
+
+### 403 Forbidden errors on --url mode
+The application now includes robust retry logic with User-Agent rotation:
+- Automatic retry with fresh browser headers on 403 errors
+- Rotating User-Agent pool to mimic different browsers
+- Exponential backoff with configurable retries
+
+If you still get 403 errors:
+- Some websites may block automated access entirely
+- Try copying the page content manually
+- Check if the site requires authentication
+
+**Debug mode for HTTP requests:**
+```bash
+# Enable DEBUG logging to see detailed HTTP diagnostics
+python -m src.main --url https://example.com --log-level DEBUG
+```
+
+You'll see:
+- Request attempts with User-Agent rotation
+- Status codes and retry attempts
+- Final error messages with response snippets
 
 ### Very slow downloads
 - Network latency is normal

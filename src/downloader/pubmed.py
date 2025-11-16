@@ -8,6 +8,7 @@ from typing import Optional
 from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
 from src.downloader.base import BaseDownloader
 from src.config import settings
+from src.network.http_client import HTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +18,7 @@ class PubMedDownloader(BaseDownloader):
     
     def __init__(self):
         super().__init__()
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": settings.USER_AGENT})
+        self.http_client = HTTPClient()
     
     def can_download(self, reference: Reference) -> bool:
         """Check if reference has PubMed info."""
@@ -110,8 +110,7 @@ class PubMedDownloader(BaseDownloader):
                 f"&ids={pmid}&format=json"
             )
             
-            response = self.session.get(url, timeout=self.timeout)
-            response.raise_for_status()
+            response = self.http_client.get(url)
             
             data = response.json()
             if 'records' in data and len(data['records']) > 0:
@@ -139,12 +138,10 @@ class PubMedDownloader(BaseDownloader):
             
             logger.info(f"Downloading from PMC: {pdf_url}")
             
-            response = self.session.get(
+            response = self.http_client.get(
                 pdf_url,
-                timeout=self.timeout,
                 allow_redirects=True
             )
-            response.raise_for_status()
             
             content = response.content
             file_size = self._save_pdf(content, output_path)
@@ -181,8 +178,7 @@ class PubMedDownloader(BaseDownloader):
                 f"db=pubmed&term={query}&rettype=json&retmode=json"
             )
             
-            response = self.session.get(search_url, timeout=self.timeout)
-            response.raise_for_status()
+            response = self.http_client.get(search_url)
             
             data = response.json()
             if 'esearchresult' in data and 'idlist' in data['esearchresult']:

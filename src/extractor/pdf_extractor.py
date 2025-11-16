@@ -10,20 +10,36 @@ from src.models import ExtractionResult, Reference
 from src.extractor.base import BaseExtractor
 from src.extractor.parser import ReferenceParser
 from src.extractor.pdf.layout import LayoutAwareExtractor
+from src.extractor.pdf.table_extractor import TableExtractor
+from src.extractor.bibtex_parser import BibTeXParser
 
 logger = logging.getLogger(__name__)
 
 
 class PDFExtractor(BaseExtractor):
-    """Extract references from PDF files with layout-aware extraction."""
+    """Extract references from PDF files with layout-aware extraction and fallbacks."""
     
-    def __init__(self):
+    def __init__(self, enable_fallbacks: bool = True):
+        """
+        Initialize PDF extractor.
+        
+        Args:
+            enable_fallbacks: Whether to enable fallback extractors
+        """
         self.parser = ReferenceParser()
         self.layout_extractor = LayoutAwareExtractor()
+        self.table_extractor = TableExtractor()
+        self.bibtex_parser = BibTeXParser()
+        self.enable_fallbacks = enable_fallbacks
     
     def extract(self, source: str) -> ExtractionResult:
         """
-        Extract references from a PDF file using layout-aware extraction.
+        Extract references from a PDF file using layout-aware extraction with fallbacks.
+        
+        Fallback order:
+        1. Layout-aware extraction (primary)
+        2. BibTeX parser (if BibTeX found)
+        3. Table extractor (if tables found)
         
         Args:
             source: Path to PDF file
@@ -46,12 +62,17 @@ class PDFExtractor(BaseExtractor):
             with pdfplumber.open(pdf_path) as pdf:
                 logger.debug(f"Processing PDF with {len(pdf.pages)} pages")
                 
-                # Use layout-aware extraction
+                # Primary: Layout-aware extraction
                 references_text = self.layout_extractor.extract_reference_section(pdf)
                 logger.debug(f"Extracted {len(references_text)} characters from reference section")
                 
-                # Parse references
+                # Parse references from primary extraction
                 references = self._parse_references(references_text)
+                logger.debug(f"Primary extraction: {len(references)} references")
+                
+                # Apply fallbacks if enabled and needed
+                if self.enable_fallbacks:
+                    references = self._apply_fallbacks(pdf, references, references_text)
                 
                 result.references = references
                 result.total_references = len(references)
@@ -63,6 +84,87 @@ class PDFExtractor(BaseExtractor):
             logger.error(f"Error extracting PDF {pdf_path}: {str(e)}")
         
         return result
+    
+    def _apply_fallbacks(
+        self,
+        pdf,
+        primary_refs: List[Reference],
+        full_text: str
+    ) -> List[Reference]:
+        """
+        Apply fallback extractors to supplement primary extraction.
+        
+        Args:
+            pdf: pdfplumber PDF object
+            primary_refs: References from primary extraction
+            full_text: Full extracted text
+            
+        Returns:
+            Enhanced list of references
+        """
+        all_refs = list(primary_refs)
+        seen_texts = {self._normalize_ref_text(ref.raw_text) for ref in primary_refs}
+        
+        # Fallback 1: BibTeX parser
+        if self.bibtex_parser.has_bibtex(full_text):
+            logger.debug("BibTeX content detected, applying BibTeX parser")
+            bibtex_blocks = self.bibtex_parser.extract_bibtex_blocks(full_text)
+            
+            for block in bibtex_blocks:
+                ref = self.bibtex_parser.parse_bibtex_entry(block)
+                if ref:
+                    # Add provenance metadata
+                    if not ref.metadata:
+                        ref.metadata = {}
+                    ref.metadata['extraction_method'] = 'bibtex_fallback'
+                    
+                    # Check for duplicates
+                    normalized = self._normalize_ref_text(ref.raw_text)
+                    if normalized not in seen_texts:
+                        all_refs.append(ref)
+                        seen_texts.add(normalized)
+            
+            logger.debug(f"BibTeX fallback added {len(all_refs) - len(primary_refs)} refs")
+        
+        # Fallback 2: Table extractor
+        if self.table_extractor.has_tables(pdf):
+            logger.debug("Tables detected, applying table extractor")
+            table_refs_text = self.table_extractor.extract_from_tables(pdf)
+            
+            for ref_text in table_refs_text:
+                # Parse table-extracted reference
+                ref = self.parser.parse_reference(ref_text)
+                if ref:
+                    # Add provenance metadata
+                    if not ref.metadata:
+                        ref.metadata = {}
+                    ref.metadata['extraction_method'] = 'table_fallback'
+                    
+                    # Check for duplicates
+                    normalized = self._normalize_ref_text(ref.raw_text)
+                    if normalized not in seen_texts:
+                        all_refs.append(ref)
+                        seen_texts.add(normalized)
+            
+            logger.debug(f"Table fallback added {len(all_refs) - len(primary_refs) - (len(all_refs) if self.bibtex_parser.has_bibtex(full_text) else 0)} refs")
+        
+        return all_refs
+    
+    def _normalize_ref_text(self, text: str) -> str:
+        """
+        Normalize reference text for duplicate detection.
+        
+        Args:
+            text: Reference text
+            
+        Returns:
+            Normalized text
+        """
+        # Convert to lowercase, remove punctuation and extra whitespace
+        text = text.lower()
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\s+', ' ', text)
+        return text[:100].strip()
     
     def _extract_text_from_pdf(self, pdf) -> str:
         """Extract all text from PDF while preserving structure."""
