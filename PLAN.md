@@ -287,80 +287,19 @@ python -m src.main --help  # Verify CLI works
 - Only process trusted PDF documents (vulnerability in pdfminer.six CMap loading)
 - Secure API keys and credentials in environment variables
 
-## Automation & CI/CD
+## Quality Assurance & Testing
 
-### Dependency Validation Automation
-The project includes comprehensive automation for dependency management:
+For comprehensive testing strategy, validation procedures, and quality assurance guidelines, see the **[Testing and Validation Plan](docs/testing/validation_plan.md)**.
 
-**Validation Script** (`scripts/validate_dependencies.py`):
-- Runs `pip check` to verify no broken requirements
-- Runs `pip-audit` with automatic allowlist handling for known vulnerabilities
-- Optional coverage validation with 80% minimum threshold
-- Generates JSON results for CI/CD integration
-- Handles the known pdfminer.six vulnerability (GHSA-f83h-ghpp-7wcc)
-
-**Makefile Targets**:
-```bash
-make validate          # Full validation (pip check + pip-audit + coverage)
-make security-check   # Security checks only
-make test-coverage    # Tests with 80% coverage enforcement
-make ci               # Full CI pipeline locally
-```
-
-### Test Coverage Enforcement
-- **Configuration**: `pytest.ini` with `--cov-fail-under=80`
-- **Reports**: XML (for CI), terminal, and JSON formats
-- **Integration**: Coverage uploaded to Codecov via GitHub Actions
-- **Local Development**: Real-time coverage feedback in terminal
-
-### GitHub Actions Workflow
-**File**: `.github/workflows/ci.yml`
-
-**Features**:
-- Matrix testing on Python 3.8 (minimum) and 3.12 (current)
-- Dependency caching for faster builds
-- Linting and formatting checks
-- Security validation with pip-audit
-- Coverage enforcement and reporting
-- Build package verification
-- PR comments with validation results
-- Artifact upload for debugging
-
-**Pipeline Stages**:
-1. **Test Matrix**: Run tests on multiple Python versions
-2. **Dependency Validation**: Security and compatibility checks
-3. **Build Verification**: Ensure package builds correctly
-4. **Coverage Reporting**: Upload to Codecov for tracking
-
-### Local Development Workflow
-```bash
-# Quick setup
-make install-dev
-
-# Before commits (recommended)
-make validate
-
-# Individual checks
-make lint            # Code quality
-make test-coverage   # Test coverage
-make security-check  # Security audit
-```
-
-### Validation Results Format
-```json
-{
-  "pip_check": {"status": "passed", "output": "...", "error": ""},
-  "pip_audit": {"status": "passed_with_allowed", "vulnerabilities": [...]},
-  "coverage": {"status": "passed", "percentage": 85.2}
-}
-```
-
-### Security Allowlist
-The automation automatically allows known, low-risk vulnerabilities:
-- `GHSA-f83h-ghpp-7wcc` (pdfminer.six CMap deserialization)
-  - Low risk for trusted PDF processing
-  - No fix available in current pdfplumber versions
-  - Documented in security audit
+Key testing areas covered:
+- Unit tests for all core components (current: 18 tests)
+- Integration tests for end-to-end workflows
+- HTTP hardening and failure scenario validation
+- Performance benchmarking and regression testing
+- Dependency security auditing
+- Manual validation with real-world academic papers
+- CLI interface testing
+- Coverage targets (>80% line coverage)
 
 ## Future Enhancements
 

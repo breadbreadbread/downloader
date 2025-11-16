@@ -459,3 +459,45 @@ The application uses the following free APIs:
 - **Sci-Hub** - Alternative paper access
 
 No API keys required for basic functionality.
+
+## Testing and Validation
+
+### Running Tests
+```bash
+# Run all tests
+python -m unittest discover tests/ -v
+
+# Run with coverage
+pip install coverage
+coverage run -m unittest discover tests/
+coverage report
+```
+
+### Current Test Coverage
+- **18 unit tests** covering core functionality
+- PDF extraction with layout-aware parsing
+- Reference parsing and validation
+- Error handling and edge cases
+
+### Validation Plan
+For comprehensive testing strategy, quality assurance procedures, and validation guidelines, see:
+- **[Testing and Validation Plan](docs/testing/validation_plan.md)** - Complete validation framework
+- **[Dependency Audit](DEPENDENCIES_AUDIT.md)** - Security and compatibility audit
+- **[PDF Extraction Improvements](PDF_EXTRACTION_IMPROVEMENTS.md)** - Layout-aware extraction details
+
+### Performance Benchmarks
+- Single-column PDF (20 refs): <2 seconds
+- Two-column PDF (50 refs): <3 seconds  
+- Three-column PDF (50 refs): <4 seconds
+- Download rate: ~3-5 seconds per paper (varies by source)
+
+## Contributing
+
+When contributing to this project:
+1. Ensure all tests pass: `python -m unittest discover tests/`
+2. Maintain >80% test coverage for new code
+3. Follow existing code style and patterns
+4. Update documentation for new features
+5. Run security audit: `pip-audit`
+
+For detailed development guidelines, see the [validation plan](docs/testing/validation_plan.md).
