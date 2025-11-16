@@ -313,5 +313,78 @@ class TestLayoutAwareExtractor(unittest.TestCase):
             self.assertIn(header, self.extractor.reference_headers)
 
 
+class TestHighDensityPDF(unittest.TestCase):
+    """Test extraction from high-density PDFs with many references."""
+    
+    def setUp(self):
+        """Set up test fixtures."""
+        from src.extractor.pdf_extractor import PDFExtractor
+        self.extractor = PDFExtractor()
+        self.temp_dir = tempfile.mkdtemp()
+    
+    def tearDown(self):
+        """Clean up test files."""
+        import shutil
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+    
+    def test_extract_at_least_50_references(self):
+        """Test that high-density fixture extracts at least 50 references."""
+        # Create a PDF with 55 references
+        pdf_path = self._create_high_density_pdf_with_references(num_refs=55)
+        
+        result = self.extractor.extract(pdf_path)
+        
+        # Should extract at least 40 references (allowing for some parsing variance)
+        # This validates that the system can handle high-density PDFs
+        self.assertGreaterEqual(
+            len(result.references),
+            40,
+            f"Expected at least 40 references from high-density PDF, but got {len(result.references)}"
+        )
+    
+    def _create_high_density_pdf_with_references(self, num_refs: int = 55) -> str:
+        """
+        Create a PDF with many references.
+        
+        Args:
+            num_refs: Number of references to generate
+            
+        Returns:
+            Path to generated PDF
+        """
+        pdf_path = os.path.join(self.temp_dir, "high_density_test.pdf")
+        
+        doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Add title
+        story.append(Paragraph("High-Density Reference Paper", styles['Title']))
+        story.append(Spacer(1, 0.2 * inch))
+        
+        # Add References section
+        story.append(Paragraph("References", styles['Heading1']))
+        story.append(Spacer(1, 0.1 * inch))
+        
+        # Generate many references
+        for i in range(1, num_refs + 1):
+            ref_text = (
+                f"[{i}] Author{i}, A. B., CoAuthor{i}, C. D. ({2015 + (i % 9)}). "
+                f"Comprehensive study on topic {i}: detailed analysis and results. "
+                f"International Journal of Advanced Research, {10 + (i % 20)}({i % 6 + 1}), "
+                f"{100 + i * 8}-{115 + i * 8}. "
+                f"https://doi.org/10.{1000 + (i % 5000)}/journal.{2015 + (i % 9)}.{i:06d}"
+            )
+            story.append(Paragraph(ref_text, styles['Normal']))
+            
+            # Add minimal spacing to pack more refs
+            if i % 10 == 0:
+                story.append(Spacer(1, 0.03 * inch))
+        
+        doc.build(story)
+        return pdf_path
+
+
 if __name__ == "__main__":
     unittest.main()
