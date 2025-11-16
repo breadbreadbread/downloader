@@ -21,8 +21,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
-from src.models import DownloadResult, DownloadStatus, DownloadSource
-
+from src.models import DownloadResult, DownloadSource, DownloadStatus
 
 DOWNLOAD_REPORT_JSON = "download_report.json"
 DOWNLOAD_REPORT_TEXT = "download_report.txt"
@@ -107,7 +106,9 @@ def serve_html(html: str, status: int = 200) -> Iterator[str]:
         thread.join(timeout=5)
 
 
-def run_cli(tmp_path: Path, env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+def run_cli(
+    tmp_path: Path, env: dict[str, str], *args: str
+) -> subprocess.CompletedProcess[str]:
     """Execute the CLI via `python -m src.main` within a temporary workspace."""
     command = [sys.executable, "-m", "src.main", *args]
     return subprocess.run(
@@ -136,7 +137,9 @@ def cli_env(project_root: Path) -> dict[str, str]:
     return env
 
 
-def test_pdf_mode_skip_download_generates_reports(tmp_path: Path, cli_env: dict[str, str]) -> None:
+def test_pdf_mode_skip_download_generates_reports(
+    tmp_path: Path, cli_env: dict[str, str]
+) -> None:
     pdf_path = tmp_path / "inputs" / "test.pdf"
     output_dir = tmp_path / "artifacts"
     make_test_pdf(pdf_path, num_refs=6)
@@ -175,7 +178,9 @@ def test_pdf_mode_skip_download_generates_reports(tmp_path: Path, cli_env: dict[
     assert len(reference_dirs) == len(data["results"])
 
 
-def test_url_mode_skip_download_uses_local_server(tmp_path: Path, cli_env: dict[str, str]) -> None:
+def test_url_mode_skip_download_uses_local_server(
+    tmp_path: Path, cli_env: dict[str, str]
+) -> None:
     html = build_reference_html(num_refs=4)
     output_dir = tmp_path / "url-artifacts"
 

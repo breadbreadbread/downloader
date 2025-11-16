@@ -2,4 +2,4 @@
 
 from src.network.http_client import HTTPClient
 
-__all__ = ['HTTPClient']
+__all__ = ["HTTPClient"]
