@@ -8,9 +8,9 @@ from bs4 import BeautifulSoup
 
 from src.models import Reference, ExtractionResult
 from src.extractor.parser import ReferenceParser
-from src.extractor.pdf.table_extractor import TableExtractor
-from src.extractor.bibtex_parser import BibTeXParser
-from src.extractor.html_fallback import HTMLFallbackExtractor
+from .table_extractor import TableExtractor
+from .bibtex_parser import BibTeXParser
+from .html_fallback import HTMLFallbackExtractor
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,10 @@ class ExtractionFallbackManager:
         self.enable_table_fallback = settings.ENABLE_TABLE_FALLBACK
         self.enable_bibtex_fallback = settings.ENABLE_BIBTEX_FALLBACK
         self.enable_html_structure_fallback = settings.ENABLE_HTML_STRUCTURE_FALLBACK
+    
+    def should_trigger_fallbacks(self, result: ExtractionResult) -> bool:
+        """Determine if fallback strategies should be applied."""
+        return len(result.references) < self.min_reference_threshold
     
     def apply_fallbacks(
         self, 
@@ -56,87 +60,6 @@ class ExtractionFallbackManager:
             return result
         
         logger.info(f"Applying fallback strategies for {source_type} source")
-        fallback_results = []
-        existing_refs_set = self._create_reference_fingerprint_set(result.references)
-        
-        # Apply table-based fallback (PDF only)
-        if source_type == 'pdf' and self.enable_table_fallback and pdf_object:
-            table_refs = self.table_extractor.extract_from_pdf(pdf_object)
-            if table_refs:
-                new_refs = self._deduplicate_references(table_refs, existing_refs_set)
-                if new_refs:
-                    fallback_results.extend(new_refs)
-                    existing_refs_set.update(self._create_reference_fingerprint_set(new_refs))
-                    logger.info(f"Table fallback extracted {len(new_refs)} additional references")
-                else:
-                    result.extraction_errors.append("Table fallback: No new unique references found")
-            else:
-                result.extraction_errors.append("Table fallback: No reference tables detected")
-        
-        # Apply BibTeX fallback (both PDF and web)
-        if self.enable_bibtex_fallback:
-            bibtex_refs = self.bibtex_parser.extract_from_text(source_text)
-            if bibtex_refs:
-                new_refs = self._deduplicate_references(bibtex_refs, existing_refs_set)
-                if new_refs:
-                    fallback_results.extend(new_refs)
-                    existing_refs_set.update(self._create_reference_fingerprint_set(new_refs))
-                    logger.info(f"BibTeX fallback extracted {len(new_refs)} additional references")
-                else:
-                    result.extraction_errors.append("BibTeX fallback: No new unique references found")
-            else:
-                result.extraction_errors.append("BibTeX fallback: No BibTeX blocks detected")
-        
-        # Apply HTML structure fallback (web only)
-        if source_type == 'web' and self.enable_html_structure_fallback and html_content:
-            html_refs = self.html_extractor.extract_from_html(html_content)
-            if html_refs:
-                new_refs = self._deduplicate_references(html_refs, existing_refs_set)
-                if new_refs:
-                    fallback_results.extend(new_refs)
-                    existing_refs_set.update(self._create_reference_fingerprint_set(new_refs))
-                    logger.info(f"HTML structure fallback extracted {len(new_refs)} additional references")
-                else:
-                    result.extraction_errors.append("HTML structure fallback: No structured citation elements found")
-            else:
-                result.extraction_errors.append("HTML structure fallback: No structured citation elements found")
-        
-        # Merge fallback results with original
-        if fallback_results:
-            result.references.extend(fallback_results)
-            result.total_references = len(result.references)
-            logger.info(f"Fallback strategies added {len(fallback_results)} references (total: {result.total_references})")
-        else:
-            result.extraction_errors.append("All fallback strategies failed to extract new references")
-        
-        return result
-    
-    def apply_fallbacks(
-        self, 
-        result: ExtractionResult, 
-        source_text: str, 
-        source_type: str,
-        pdf_object: Any = None,
-        html_content: Optional[str] = None
-    ) -> ExtractionResult:
-        """
-        Apply fallback strategies to improve extraction results.
-        
-        Args:
-            result: Current extraction result
-            source_text: Raw text content
-            source_type: 'pdf' or 'web'
-            pdf_object: pdfplumber PDF object (for PDF fallbacks)
-            html_content: Raw HTML content (for web fallbacks)
-            
-        Returns:
-            Enhanced ExtractionResult with fallback references
-        """
-        if not self.should_trigger_fallbacks(result):
-            return result
-        
-        logger.info(f"Applying fallback strategies for {source_type} source")
-        
         fallback_results = []
         existing_refs_set = self._create_reference_fingerprint_set(result.references)
         

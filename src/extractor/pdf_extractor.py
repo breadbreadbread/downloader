@@ -12,7 +12,9 @@ from src.extractor.bibtex_parser import BibTeXParser
 from src.extractor.parser import ReferenceParser
 from src.extractor.pdf.layout import LayoutAwareExtractor
 from src.extractor.pdf.table_extractor import TableExtractor
+from src.extractor.fallbacks import ExtractionFallbackManager
 from src.models import ExtractionResult, Reference
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,7 @@ class PDFExtractor(BaseExtractor):
         self.layout_extractor = LayoutAwareExtractor()
         self.table_extractor = TableExtractor()
         self.bibtex_parser = BibTeXParser()
+        self.fallback_manager = ExtractionFallbackManager()
         self.enable_fallbacks = enable_fallbacks
 
     def extract(self, source: str) -> ExtractionResult:
