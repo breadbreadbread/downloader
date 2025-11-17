@@ -83,6 +83,23 @@ reference-downloader/
 └── .gitignore
 ```
 
+## Validation & Quality Assurance
+
+A pragmatic validation strategy focuses on:
+
+- **HTTPClient behavior**: timeout, retry, User-Agent rotation (tests in `tests/test_http_hardening.py`)
+- **Layout-aware PDF extraction**: multi-column accuracy, caption filtering (`tests/test_pdf_extractor.py`, `tests/test_extraction_fallbacks.py`)
+- **Download coordination**: fallback chains, duplicate skipping (`tests/test_download_coordinator.py`)
+- **CLI stability**: error paths, report generation with `--skip-download` (`tests/test_cli.py`, `tests/e2e/test_cli_modes.py`)
+- **Performance baselines**: extraction time/memory guardrails (`scripts/measure_performance.py`)
+
+**Full details**: [`docs/testing/validation_plan.md`](docs/testing/validation_plan.md)  
+**Implementation summary**: [`VALIDATION_IMPLEMENTATION_SUMMARY.md`](VALIDATION_IMPLEMENTATION_SUMMARY.md)
+
+All tests use pytest with ≥80% coverage requirement (enforced in `pytest.ini`). Helper scripts (`scripts/generate_test_pdfs.py`, `scripts/measure_performance.py`) rely only on pinned dependencies.
+
+---
+
 ## Key Dependencies
 
 ### Audited Core Runtime Dependencies (Active)
@@ -100,7 +117,7 @@ Carefully versioned with upper bounds to prevent breaking changes:
 Installed with: `pip install -r requirements-dev.txt` or `pip install -e .[dev]`
 
 - `pytest` - Test framework
-- `pytest-cov` - Code coverage
+- `pytest-cov` - Code coverage with 80% enforcement
 - `black` - Code formatting
 - `isort` - Import sorting
 - `flake8` - Linting
@@ -286,6 +303,20 @@ python -m src.main --help  # Verify CLI works
 - Document all sources used
 - Only process trusted PDF documents (vulnerability in pdfminer.six CMap loading)
 - Secure API keys and credentials in environment variables
+
+## Quality Assurance & Testing
+
+For comprehensive testing strategy, validation procedures, and quality assurance guidelines, see the **[Testing and Validation Plan](docs/testing/validation_plan.md)**.
+
+Key testing areas covered:
+- Unit tests for all core components (current: 18 tests)
+- Integration tests for end-to-end workflows
+- HTTP hardening and failure scenario validation
+- Performance benchmarking and regression testing
+- Dependency security auditing
+- Manual validation with real-world academic papers
+- CLI interface testing
+- Coverage targets (>80% line coverage)
 
 ## Future Enhancements
 

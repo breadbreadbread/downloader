@@ -84,11 +84,18 @@ python -m src.main --url https://example.com/research --output ./downloads
 
 ### Verbose Logging
 
-Get detailed information about what's happening:
+Get detailed information about what's happening, including PDF layout detection and reference filtering:
 
 ```bash
 python -m src.main --pdf paper.pdf --log-level DEBUG
 ```
+
+This shows:
+- Column detection (single vs. multi-column layouts)
+- Reference section identification
+- Figure caption filtering
+- Reference splitting method used
+- Individual parsing decisions
 
 ## Python API
 
@@ -119,13 +126,17 @@ print(f"Failed: {summary.failed}")
 
 ### No references found?
 
-The PDF might not have a references section, or it might be formatted unusually. Try:
+The PDF might not have a references section, or it might be formatted unusually. The improved layout-aware extraction handles multi-column PDFs and filters out figure captions, but some PDFs may still be challenging. Try:
 
 ```bash
 python -m src.main --pdf paper.pdf --log-level DEBUG --skip-download
 ```
 
-Check the logs for details about what was extracted.
+Check the logs for details about:
+- Whether the reference section was detected
+- Number of columns detected
+- How many blocks were filtered as non-references
+- Which splitting method was used
 
 ### Downloads failing?
 
@@ -133,7 +144,38 @@ This is normal - not all papers are freely available online. The tool tries mult
 
 ### Network errors?
 
-Check your internet connection and try again. The tool has built-in retry logic.
+Check your internet connection and try again. The tool has built-in retry logic with automatic User-Agent rotation on 403 Forbidden errors.
+
+### Getting 403 Forbidden errors on --url?
+
+The tool now automatically handles this with:
+- User-Agent rotation from a pool of 6 browser variants
+- Automatic retry with fresh headers
+- Exponential backoff
+
+Enable debug mode to see the retry attempts:
+```bash
+python -m src.main --url https://example.com --log-level DEBUG
+```
+
+## Validation & Testing
+
+Need to verify a change quickly?
+
+1. Generate synthetic PDFs (optional but recommended):
+   ```bash
+   python scripts/generate_test_pdfs.py
+   ```
+2. Run the fast regression suite:
+   ```bash
+   pytest
+   ```
+3. Capture performance metrics when extractor or HTTP logic changes:
+   ```bash
+   python scripts/measure_performance.py
+   ```
+
+Full guidance lives in the validation plan: [docs/testing/validation_plan.md](docs/testing/validation_plan.md).
 
 ## Next Steps
 
@@ -148,6 +190,8 @@ Check your internet connection and try again. The tool has built-in retry logic.
 2. **Use DOIs when available** - Papers with DOI identifiers download fastest
 3. **Check for special characters** - Some PDFs have encoding issues that affect extraction
 4. **Be patient** - Downloads can take a while depending on sources and network speed
+5. **Multi-column PDFs work great** - The tool now handles 1-3 column layouts automatically
+6. **Use DEBUG logging for troubleshooting** - See exactly how references are being extracted
 
 ## Configuration
 

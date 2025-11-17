@@ -8,6 +8,7 @@ from typing import Optional
 from src.models import Reference, DownloadResult, DownloadStatus, DownloadSource
 from src.downloader.base import BaseDownloader
 from src.config import settings
+from src.network.http_client import HTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +18,7 @@ class DOIResolver(BaseDownloader):
     
     def __init__(self):
         super().__init__()
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": settings.USER_AGENT})
+        self.http_client = HTTPClient()
     
     def can_download(self, reference: Reference) -> bool:
         """Check if reference has a DOI."""
@@ -76,8 +76,7 @@ class DOIResolver(BaseDownloader):
         try:
             # Query CrossRef API
             url = f"https://api.crossref.org/works/{doi}"
-            response = self.session.get(url, timeout=self.timeout)
-            response.raise_for_status()
+            response = self.http_client.get(url)
             
             data = response.json()
             if data.get('status') != 'ok':
@@ -113,13 +112,11 @@ class DOIResolver(BaseDownloader):
     ) -> DownloadResult:
         """Download PDF from URL."""
         try:
-            response = self.session.get(
+            response = self.http_client.get(
                 url,
-                timeout=self.timeout,
                 allow_redirects=True,
                 stream=True
             )
-            response.raise_for_status()
             
             content = response.content
             file_size = self._save_pdf(content, output_path)

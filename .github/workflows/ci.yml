@@ -1,0 +1,189 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test on Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.12"]  # Minimum and supported maximum
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt -r requirements-dev.txt
+        pip install -e .
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Run linting
+      run: |
+        make lint
+    
+    - name: Run tests with coverage
+      run: |
+        make test-coverage
+    
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.12'  # Only upload from one job
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+    
+    - name: Run security checks
+      run: |
+        make security-check
+    
+    - name: Upload validation results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: validation-results-py${{ matrix.python-version }}
+        path: |
+          validation-results.json
+          coverage.xml
+        retention-days: 30
+
+  validate-dependencies:
+    name: Validate Dependencies
+    runs-on: ubuntu-latest
+    needs: test  # Only run if tests pass
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt -r requirements-dev.txt
+        pip install -e .
+    
+    - name: Run full validation
+      run: |
+        make validate
+    
+    - name: Fail if validation failed
+      run: |
+        if [ ! -f validation-results.json ]; then
+          echo "Validation results file not found"
+          exit 1
+        fi
+        
+        # Check validation results
+        python -c "
+import json
+with open('validation-results.json') as f:
+    results = json.load(f)
+
+# Check each validation step
+for check, result in results.items():
+    if result.get('status') == 'failed':
+        print(f'❌ {check} failed')
+        exit(1)
+    elif result.get('status') == 'error':
+        print(f'⚠️ {check} had errors')
+        exit(1)
+
+print('✅ All validations passed')
+        "
+    
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          if (fs.existsSync('validation-results.json')) {
+            const results = JSON.parse(fs.readFileSync('validation-results.json', 'utf8'));
+            
+            let comment = '## 🔍 Validation Results\n\n';
+            
+            // Pip check results
+            const pipCheck = results.pip_check;
+            if (pipCheck.status === 'passed') {
+              comment += '✅ **pip check**: No broken requirements\n';
+            } else {
+              comment += '❌ **pip check**: Broken requirements detected\n';
+            }
+            
+            // Pip audit results
+            const pipAudit = results.pip_audit;
+            if (pipAudit.status === 'passed') {
+              comment += '✅ **pip audit**: No vulnerabilities found\n';
+            } else if (pipAudit.status === 'passed_with_allowed') {
+              comment += '⚠️ **pip audit**: Known but approved vulnerabilities found\n';
+            } else {
+              comment += '❌ **pip audit**: Unapproved vulnerabilities found\n';
+            }
+            
+            // Coverage results
+            const coverage = results.coverage;
+            if (coverage.status === 'passed') {
+              const percentage = coverage.percentage || '≥80';
+              comment += `✅ **Coverage**: ${percentage}% (meets 80% requirement)\n`;
+            } else {
+              comment += '❌ **Coverage**: Below 80% threshold\n';
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          }
+
+  build-check:
+    name: Build Package Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+    
+    - name: Build package
+      run: |
+        python -m build
+    
+    - name: Check package
+      run: |
+        twine check dist/*

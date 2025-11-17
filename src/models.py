@@ -1,8 +1,8 @@
 """Data models for references and download results."""
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class DownloadSource(str, Enum):
@@ -53,6 +53,7 @@ class Reference(BaseModel):
     # Additional metadata
     publisher: Optional[str] = Field(None, description="Publisher name")
     publication_type: Optional[str] = Field(None, description="Type (journal, conference, book, etc.)")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata (e.g., extraction method)")
     
     def get_output_folder_name(self) -> str:
         """Get the output folder name based on first author and year."""
@@ -82,15 +83,14 @@ class Reference(BaseModel):
 class DownloadResult(BaseModel):
     """Result of a download attempt."""
     
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     reference: Reference
     status: DownloadStatus
     source: DownloadSource
     file_path: Optional[str] = Field(None, description="Path to downloaded file")
     error_message: Optional[str] = Field(None, description="Error message if failed")
     file_size: Optional[int] = Field(None, description="Size of downloaded file in bytes")
-    
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class ExtractionResult(BaseModel):

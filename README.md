@@ -5,7 +5,9 @@ A comprehensive Python application that extracts bibliographic references from P
 ## Features
 
 - **Reference Extraction**
-  - Extract references from PDF documents using advanced text parsing
+  - Extract references from PDF documents using layout-aware parsing
+  - Support for multi-column PDF layouts (1-3 columns)
+  - Intelligent filtering of figure captions, tables, and non-reference content
   - Extract references from web pages
   - Support for multiple reference formats (Harvard, APA, Chicago, etc.)
   - **Extraction fallback strategies** for edge cases:
@@ -14,6 +16,11 @@ A comprehensive Python application that extracts bibliographic references from P
     - HTML structure analysis: Extracts from lists, citations, and structured elements
   - Identification and extraction of DOI, URLs, PMID, and arXiv IDs
   - Author, title, journal, year, and page number extraction
+  - **Extraction Fallbacks** (configurable):
+    - BibTeX parser for embedded BibTeX entries
+    - Table extractor for tabular reference layouts
+    - HTML fallback for structured web content
+    - Deduplication across all extraction methods
 
 - **Paper Download**
   - Multiple download sources with intelligent fallback strategy:
@@ -69,6 +76,7 @@ The project uses carefully versioned dependencies to ensure compatibility and se
 
 **Development Dependencies (optional):**
 - pytest, black, isort, flake8, mypy, pylint for development
+- pytest-cov for coverage reporting and enforcement
 - pip-audit for security scanning
 - responses for HTTP mocking in tests
 
@@ -96,8 +104,11 @@ python -m src.main --pdf /path/to/paper.pdf --skip-download
 --url URL               URL of web page to extract references from
 --output DIR            Output directory for downloaded papers (default: ./downloads)
 --log-level LEVEL       Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)
+                        Use DEBUG for detailed extraction logging
 --skip-download         Only extract references, don't download papers
 ```
+
+**Note:** Use `--log-level DEBUG` to see detailed information about the PDF extraction process, including column detection, reference section identification, and filtering decisions.
 
 ## Output Structure
 
@@ -118,6 +129,9 @@ Configuration can be customized in `src/config.py`. Key settings:
 
 - `TIMEOUT`: HTTP request timeout (default: 30 seconds)
 - `MAX_RETRIES`: Number of retry attempts (default: 3)
+- `RETRY_DELAY`: Base delay between retries in seconds (default: 2)
+- `REQUEST_DELAY`: Delay between requests to respect rate limits (default: 0.5)
+- `USER_AGENT_POOL`: List of User-Agent strings to rotate through (default: 6 browser variants)
 - `ENABLE_SCIHUB`: Enable/disable Sci-Hub access (default: True)
 - `ENABLE_PUBMED`: Enable/disable PubMed access (default: True)
 - `ENABLE_ARXIV`: Enable/disable arXiv access (default: True)
@@ -131,12 +145,25 @@ PUBMED_API_KEY=your_key_here
 CROSSREF_EMAIL=your.email@example.com
 ```
 
+**Advanced: Custom User-Agent Pool**
+You can customize the User-Agent pool in `src/config.py` by modifying `USER_AGENT_POOL`.
+The client will randomly select and rotate through these agents on 403 errors.
+
 ## Architecture
 
 ### Components
 
+- **Network Module** (`src/network/`)
+  - `HTTPClient`: Centralized HTTP client with retry logic and header rotation
+    - Automatic retry on 429, 500, 502, 503, 504, 403 errors
+    - User-Agent rotation from configurable pool
+    - Exponential backoff with respect for Retry-After headers
+    - Desktop browser headers (Accept, Accept-Language, etc.)
+    - Request/response logging at DEBUG level
+
 - **Extractor Module** (`src/extractor/`)
-  - `PDFExtractor`: Extract text and references from PDFs
+  - `PDFExtractor`: Extract text and references from PDFs with layout awareness
+  - `LayoutAwareExtractor`: Layout-aware PDF parsing with column detection
   - `WebExtractor`: Extract content from web pages
   - `ReferenceParser`: Parse raw reference text into structured data
 
@@ -219,11 +246,16 @@ The application attempts to download papers in the following priority order:
 ## Error Handling
 
 The application handles various error scenarios:
-- Network errors with retry logic
+- **Network errors with robust retry logic**
+  - Automatic retry on 403, 429, 500, 502, 503, 504 status codes
+  - User-Agent rotation on 403 Forbidden errors
+  - Exponential backoff between retry attempts
+  - Respects Retry-After headers from servers
 - Invalid PDF format detection
 - Missing or incomplete reference information
-- Download failures with detailed error messages
-- Automatic fallback to alternative sources
+- Download failures with detailed error messages (status code + response snippet)
+- Automatic fallback to alternative download sources
+- Sanitized logging to avoid leaking sensitive data (tokens, keys)
 
 ## Performance
 
@@ -240,9 +272,137 @@ Typical performance on a modern system:
 - Sci-Hub access depends on your jurisdiction's regulations
 - Citation of papers and sources is encouraged
 
+## Development Workflow
+
+This project includes comprehensive automation for dependency management, testing, and quality assurance.
+
+### Quick Start for Developers
+
+```bash
+# Install all dependencies (including dev tools)
+make install-dev
+
+# Run the full validation suite (recommended before commits)
+make validate
+
+# Run individual checks
+make test-coverage    # Tests with 80% coverage enforcement
+make security-check   # pip check + pip-audit
+make lint            # Code quality checks
+```
+
+### Available Make Commands
+
+| Command | Description |
+|---------|-------------|
+| `make install` | Install runtime dependencies only |
+| `make install-dev` | Install all dependencies including dev tools |
+| `make test` | Run unit tests |
+| `make test-coverage` | Run tests with coverage (enforces 80% minimum) |
+| `make validate` | Run full validation (pip check + pip-audit + coverage) |
+| `make security-check` | Run security checks only (pip check + pip-audit) |
+| `make lint` | Run linting tools (black, isort, flake8, mypy) |
+| `make format` | Format code (black, isort) |
+| `make clean` | Clean temporary files and artifacts |
+| `make ci` | Run full CI pipeline locally |
+
+### Dependency Validation
+
+The project includes automated dependency validation that checks:
+
+1. **pip check** - Ensures no broken requirements or version conflicts
+2. **pip-audit** - Scans for known security vulnerabilities
+   - Automatically allows the known pdfminer.six vulnerability (GHSA-f83h-ghpp-7wcc)
+   - Fails on any unapproved vulnerabilities
+3. **Coverage** - Enforces 80% minimum test coverage
+
+```bash
+# Run validation manually
+python scripts/validate_dependencies.py --coverage --verbose
+
+# Or use the Makefile target
+make validate
+```
+
+### Test Coverage
+
+- **Minimum requirement**: 80% line coverage
+- **Reports**: Generated in XML (for CI) and terminal formats
+- **Configuration**: See `pytest.ini` for settings
+- **Validation Plan**: Comprehensive testing strategy documented in [`docs/testing/validation_plan.md`](docs/testing/validation_plan.md)
+
+```bash
+# Run coverage check
+pytest --cov=src --cov-report=xml --cov-fail-under=80
+
+# Or use the Makefile target
+make test-coverage
+```
+
+The validation plan covers unit, integration, and CLI testing with architecture-specific guidance for HTTPClient, layout-aware extraction, and download coordination. See [`VALIDATION_IMPLEMENTATION_SUMMARY.md`](VALIDATION_IMPLEMENTATION_SUMMARY.md) for delivered components.
+
+### Security Auditing
+
+```bash
+# Quick security check
+pip-audit
+
+# Detailed validation with allowlist handling
+python scripts/validate_dependencies.py --verbose
+```
+
+### CI/CD Integration
+
+The project includes a GitHub Actions workflow (`.github/workflows/ci.yml`) that:
+
+- Tests on Python 3.8 (minimum) and 3.12 (current)
+- Runs linting, formatting checks, and security validation
+- Enforces 80% test coverage
+- Uploads coverage reports to Codecov
+- Fails builds on dependency conflicts or unapproved vulnerabilities
+- Comments pull requests with validation results
+
+### Validation Results
+
+Validation results are saved to `validation-results.json` for CI/CD integration:
+
+```json
+{
+  "pip_check": {
+    "status": "passed",
+    "output": "No broken requirements found",
+    "error": ""
+  },
+  "pip_audit": {
+    "status": "passed_with_allowed",
+    "vulnerabilities": [...],
+    "output": "",
+    "error": ""
+  },
+  "coverage": {
+    "status": "passed",
+    "percentage": 85.2,
+    "output": "",
+    "error": ""
+  }
+}
+```
+
+👉 Use the release checklist template at [`docs/validation-results/validation_checklist_template.md`](docs/validation-results/validation_checklist_template.md) to capture evidence. Helper scripts:
+
+- `python scripts/generate_test_pdfs.py` – regenerate synthetic fixtures for extractor testing
+- `python scripts/measure_performance.py` – capture baseline extraction/download performance
+
 ## Contributing
 
-Contributions are welcome! Areas for improvement:
+Contributions are welcome! Please ensure:
+
+1. **Code Quality**: Run `make lint` and `make format` before submitting
+2. **Tests**: Maintain >80% test coverage (`make test-coverage`)
+3. **Dependencies**: Run `make validate` to check for security issues
+4. **Documentation**: Update relevant documentation
+
+Areas for improvement:
 - Additional download sources
 - Better reference parsing
 - Performance optimization
@@ -297,6 +457,28 @@ pip-audit
 - Verify DOI format if using DOI search
 - Try disabling problematic sources in settings
 
+### 403 Forbidden errors on --url mode
+The application now includes robust retry logic with User-Agent rotation:
+- Automatic retry with fresh browser headers on 403 errors
+- Rotating User-Agent pool to mimic different browsers
+- Exponential backoff with configurable retries
+
+If you still get 403 errors:
+- Some websites may block automated access entirely
+- Try copying the page content manually
+- Check if the site requires authentication
+
+**Debug mode for HTTP requests:**
+```bash
+# Enable DEBUG logging to see detailed HTTP diagnostics
+python -m src.main --url https://example.com --log-level DEBUG
+```
+
+You'll see:
+- Request attempts with User-Agent rotation
+- Status codes and retry attempts
+- Final error messages with response snippets
+
 ### Very slow downloads
 - Network latency is normal
 - Sci-Hub mirrors may be slower
@@ -309,6 +491,45 @@ pip-audit
 - **Mitigation**: Only process trusted PDF files from reliable sources
 - This vulnerability requires write access to CMap directories (unlikely in normal use)
 
+## Configuration
+
+The application can be configured through settings in `src/config.py`:
+
+### Feature Flags
+```python
+# Download sources
+ENABLE_SCIHUB = True          # Enable Sci-Hub downloads
+ENABLE_PUBMED = True          # Enable PubMed access
+ENABLE_ARXIV = True           # Enable arXiv downloads
+ENABLE_BIORXIV = True         # Enable bioRxiv downloads
+ENABLE_CHEMRXIV = True        # Enable chemRxiv downloads
+ENABLE_OPEN_ACCESS = True      # Enable open-access sources
+
+# Extraction fallbacks
+ENABLE_PDF_FALLBACKS = True   # Enable all PDF fallbacks
+ENABLE_WEB_FALLBACKS = True    # Enable all web fallbacks
+ENABLE_BIBTEX_FALLBACK = True # Enable BibTeX parser
+ENABLE_TABLE_FALLBACK = True  # Enable table extractor
+ENABLE_HTML_FALLBACK = True   # Enable HTML fallback
+```
+
+### HTTP Settings
+```python
+TIMEOUT = 30                  # Request timeout (seconds)
+MAX_RETRIES = 3               # Maximum retry attempts
+RETRY_DELAY = 2               # Delay between retries (seconds)
+REQUEST_DELAY = 0.5           # Delay between requests (seconds)
+ARXIV_DELAY = 3               # Special delay for arXiv API
+```
+
+### File Settings
+```python
+MAX_FILE_SIZE = 100 * 1024 * 1024  # Maximum download size (100MB)
+OUTPUT_DIR = "./downloads"           # Download directory
+CACHE_DIR = "./.cache"               # Cache directory
+LOG_FILE = "./ref_downloader.log"    # Log file location
+```
+
 ## API Dependencies
 
 The application uses the following free APIs:
@@ -318,3 +539,45 @@ The application uses the following free APIs:
 - **Sci-Hub** - Alternative paper access
 
 No API keys required for basic functionality.
+
+## Testing and Validation
+
+### Running Tests
+```bash
+# Run all tests
+python -m unittest discover tests/ -v
+
+# Run with coverage
+pip install coverage
+coverage run -m unittest discover tests/
+coverage report
+```
+
+### Current Test Coverage
+- **18 unit tests** covering core functionality
+- PDF extraction with layout-aware parsing
+- Reference parsing and validation
+- Error handling and edge cases
+
+### Validation Plan
+For comprehensive testing strategy, quality assurance procedures, and validation guidelines, see:
+- **[Testing and Validation Plan](docs/testing/validation_plan.md)** - Complete validation framework
+- **[Dependency Audit](DEPENDENCIES_AUDIT.md)** - Security and compatibility audit
+- **[PDF Extraction Improvements](PDF_EXTRACTION_IMPROVEMENTS.md)** - Layout-aware extraction details
+
+### Performance Benchmarks
+- Single-column PDF (20 refs): <2 seconds
+- Two-column PDF (50 refs): <3 seconds  
+- Three-column PDF (50 refs): <4 seconds
+- Download rate: ~3-5 seconds per paper (varies by source)
+
+## Contributing
+
+When contributing to this project:
+1. Ensure all tests pass: `python -m unittest discover tests/`
+2. Maintain >80% test coverage for new code
+3. Follow existing code style and patterns
+4. Update documentation for new features
+5. Run security audit: `pip-audit`
+
+For detailed development guidelines, see the [validation plan](docs/testing/validation_plan.md).
