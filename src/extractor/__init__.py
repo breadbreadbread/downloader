@@ -10,4 +10,7 @@ __all__ = [
     "PDFExtractor",
     "WebExtractor",
     "ReferenceParser",
+    "BibTeXParser",
+    "HTMLFallbackExtractor",
+    "TableExtractor",
 ]

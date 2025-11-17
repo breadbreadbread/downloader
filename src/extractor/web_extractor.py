@@ -125,3 +125,56 @@ class WebExtractor(BaseExtractor):
         references = [p.strip() for p in parts if p.strip() and len(p.strip()) > 10]
 
         return references if references else [text]
+    
+    def _merge_references(self, primary_refs: List[Reference], fallback_refs: List[Reference]) -> List[Reference]:
+        """
+        Merge references from primary and fallback sources with deduplication.
+        
+        Args:
+            primary_refs: References from primary extraction
+            fallback_refs: References from fallback extraction
+            
+        Returns:
+            Merged list of references
+        """
+        logger.debug(
+            f"Merging {len(primary_refs)} primary refs with "
+            f"{len(fallback_refs)} fallback refs"
+        )
+        
+        all_refs = list(primary_refs)
+        seen_texts = {self._normalize_ref_text(ref.raw_text) for ref in primary_refs}
+        
+        # Add fallback refs that aren't duplicates
+        added = 0
+        for ref in fallback_refs:
+            normalized = self._normalize_ref_text(ref.raw_text)
+            if normalized not in seen_texts:
+                # Add provenance metadata
+                if not ref.metadata:
+                    ref.metadata = {}
+                ref.metadata['extraction_method'] = 'html_fallback'
+                
+                all_refs.append(ref)
+                seen_texts.add(normalized)
+                added += 1
+        
+        logger.debug(f"Added {added} unique references from HTML fallback")
+        return all_refs
+    
+    def _normalize_ref_text(self, text: str) -> str:
+        """
+        Normalize reference text for duplicate detection.
+        
+        Args:
+            text: Reference text
+            
+        Returns:
+            Normalized text
+        """
+        import re
+        # Convert to lowercase, remove punctuation and extra whitespace
+        text = text.lower()
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\s+', ' ', text)
+        return text[:100].strip()

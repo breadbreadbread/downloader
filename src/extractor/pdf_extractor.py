@@ -25,7 +25,8 @@ class PDFExtractor(BaseExtractor):
         Initialize PDF extractor.
 
         Args:
-            enable_fallbacks: Whether to enable fallback extractors
+            enable_fallbacks: Whether to enable fallback extractors.
+                            If None, uses settings.ENABLE_PDF_FALLBACKS
         """
         self.parser = ReferenceParser()
         self.layout_extractor = LayoutAwareExtractor()
@@ -106,7 +107,8 @@ class PDFExtractor(BaseExtractor):
         seen_texts = {self._normalize_ref_text(ref.raw_text) for ref in primary_refs}
 
         # Fallback 1: BibTeX parser
-        if self.bibtex_parser.has_bibtex(full_text):
+        if (settings.ENABLE_BIBTEX_FALLBACK and 
+            self.bibtex_parser.has_bibtex(full_text)):
             logger.debug("BibTeX content detected, applying BibTeX parser")
             bibtex_blocks = self.bibtex_parser.extract_bibtex_blocks(full_text)
 
@@ -129,7 +131,8 @@ class PDFExtractor(BaseExtractor):
             )
 
         # Fallback 2: Table extractor
-        if self.table_extractor.has_tables(pdf):
+        if (settings.ENABLE_TABLE_FALLBACK and 
+            self.table_extractor.has_tables(pdf)):
             logger.debug("Tables detected, applying table extractor")
             table_refs_text = self.table_extractor.extract_from_tables(pdf)
 
