@@ -211,12 +211,17 @@ except Exception as e:
 
 ### PDFExtractor
 
-Extract references from PDF files.
+Extract references from PDF files with layout-aware parsing and configurable fallbacks.
 
 ```python
 from src.extractor import PDFExtractor
 
+# Enable fallbacks (default, uses settings.ENABLE_PDF_FALLBACKS)
 extractor = PDFExtractor()
+
+# Or explicitly control fallbacks
+extractor = PDFExtractor(enable_fallbacks=True)  # Enable fallbacks
+extractor = PDFExtractor(enable_fallbacks=False) # Disable fallbacks
 
 # Extract references from a PDF
 result = extractor.extract("paper.pdf")
@@ -226,31 +231,71 @@ for ref in result.references:
     print(f"  - {ref.title} ({ref.year})")
     if ref.doi:
         print(f"    DOI: {ref.doi}")
+    if ref.metadata and 'extraction_method' in ref.metadata:
+        print(f"    Source: {ref.metadata['extraction_method']}")
 ```
 
 **Methods:**
 
 - `extract(source: str) -> ExtractionResult`: Extract references from PDF file
+- `__init__(enable_fallbacks: Optional[bool] = None)`: Initialize with optional fallback control
+
+**Fallback Features:**
+- **BibTeX Parser**: Extracts embedded BibTeX entries when detected
+- **Table Extractor**: Handles tabular reference layouts  
+- **Deduplication**: Prevents duplicate references across methods
+- **Provenance Tracking**: Adds metadata to identify extraction method
+
+**Configuration:**
+Fallback behavior can be controlled via settings:
+```python
+# In src/config.py
+ENABLE_PDF_FALLBACKS = True   # Master switch for PDF fallbacks
+ENABLE_BIBTEX_FALLBACK = True # BibTeX parser
+ENABLE_TABLE_FALLBACK = True  # Table extractor
+```
 
 ### WebExtractor
 
-Extract references from web pages.
+Extract references from web pages with configurable HTML fallback.
 
 ```python
 from src.extractor import WebExtractor
 
+# Enable fallbacks (default, uses settings.ENABLE_WEB_FALLBACKS)
 extractor = WebExtractor()
+
+# Or explicitly control fallbacks
+extractor = WebExtractor(enable_fallbacks=True)  # Enable fallbacks
+extractor = WebExtractor(enable_fallbacks=False) # Disable fallbacks
 
 # Extract references from a web page
 result = extractor.extract("https://example.com/paper")
 
 for ref in result.references:
     print(f"  - {ref.title}")
+    if ref.metadata and 'extraction_method' in ref.metadata:
+        print(f"    Source: {ref.metadata['extraction_method']}")
 ```
 
 **Methods:**
 
 - `extract(source: str) -> ExtractionResult`: Extract references from URL
+- `__init__(enable_fallbacks: Optional[bool] = None)`: Initialize with optional fallback control
+
+**Fallback Features:**
+- **HTML Structure Parser**: Extracts from structured HTML (lists, divs, sections)
+- **Reference Section Detection**: Finds reference sections by ID/class/heading
+- **Deduplication**: Merges primary and fallback results without duplicates
+- **Provenance Tracking**: Adds metadata to identify extraction method
+
+**Configuration:**
+Fallback behavior can be controlled via settings:
+```python
+# In src/config.py
+ENABLE_WEB_FALLBACKS = True    # Master switch for web fallbacks
+ENABLE_HTML_FALLBACK = True   # HTML structure parser
+```
 
 ### ReferenceParser
 
