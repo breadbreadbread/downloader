@@ -1,4 +1,6 @@
-"""Tests for download coordinator and fallback pipeline."""
+"""Focused tests for download coordinator fallback pipeline."""
+
+from __future__ import annotations
 
 import unittest
 from pathlib import Path

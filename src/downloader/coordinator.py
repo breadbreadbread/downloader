@@ -62,7 +62,7 @@ class DownloadCoordinator:
                 result = DownloadResult(
                     reference=reference,
                     status=DownloadStatus.SKIPPED,
-                    source=None,
+                    source=DownloadSource.UNKNOWN,
                     file_path=str(output_path),
                     file_size=output_path.stat().st_size,
                 )

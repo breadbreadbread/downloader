@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """
 Generate synthetic test PDFs for validation testing.
+
+Usage:
+    python scripts/generate_test_pdfs.py
+
+Dependencies:
+    - reportlab (part of requirements.txt)
+
+Output:
+    Creates synthetic PDFs in tests/fixtures/synthetic/:
+    - single_column_20_refs.pdf
+    - single_column_50_refs.pdf
+    - two_column_20_refs.pdf
+    - two_column_50_refs.pdf
+    - three_column_20_refs.pdf
+    - three_column_50_refs.pdf
+    - pdf_with_captions.pdf
 """
 
 import os

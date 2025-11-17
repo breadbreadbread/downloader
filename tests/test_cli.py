@@ -1,4 +1,6 @@
-"""Tests for CLI interface and command-line functionality."""
+"""Focused smoke tests for CLI interface and command-line functionality."""
+
+from __future__ import annotations
 
 import os
 import subprocess

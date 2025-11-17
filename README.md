@@ -299,6 +299,7 @@ make validate
 - **Minimum requirement**: 80% line coverage
 - **Reports**: Generated in XML (for CI) and terminal formats
 - **Configuration**: See `pytest.ini` for settings
+- **Validation Plan**: Comprehensive testing strategy documented in [`docs/testing/validation_plan.md`](docs/testing/validation_plan.md)
 
 ```bash
 # Run coverage check
@@ -307,6 +308,8 @@ pytest --cov=src --cov-report=xml --cov-fail-under=80
 # Or use the Makefile target
 make test-coverage
 ```
+
+The validation plan covers unit, integration, and CLI testing with architecture-specific guidance for HTTPClient, layout-aware extraction, and download coordination. See [`VALIDATION_IMPLEMENTATION_SUMMARY.md`](VALIDATION_IMPLEMENTATION_SUMMARY.md) for delivered components.
 
 ### Security Auditing
 
@@ -354,6 +357,11 @@ Validation results are saved to `validation-results.json` for CI/CD integration:
   }
 }
 ```
+
+👉 Use the release checklist template at [`docs/validation-results/validation_checklist_template.md`](docs/validation-results/validation_checklist_template.md) to capture evidence. Helper scripts:
+
+- `python scripts/generate_test_pdfs.py` – regenerate synthetic fixtures for extractor testing
+- `python scripts/measure_performance.py` – capture baseline extraction/download performance
 
 ## Contributing
 
