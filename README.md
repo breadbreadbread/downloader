@@ -12,6 +12,11 @@ A comprehensive Python application that extracts bibliographic references from P
   - Support for multiple reference formats (Harvard, APA, Chicago, etc.)
   - Identification and extraction of DOI, URLs, PMID, and arXiv IDs
   - Author, title, journal, year, and page number extraction
+  - **Extraction Fallbacks** (configurable):
+    - BibTeX parser for embedded BibTeX entries
+    - Table extractor for tabular reference layouts
+    - HTML fallback for structured web content
+    - Deduplication across all extraction methods
 
 - **Paper Download**
   - Multiple download sources with intelligent fallback strategy:
@@ -296,7 +301,6 @@ make validate
 - **Minimum requirement**: 80% line coverage
 - **Reports**: Generated in XML (for CI) and terminal formats
 - **Configuration**: See `pytest.ini` for settings
-- **Validation Plan**: Comprehensive testing strategy documented in [`docs/testing/validation_plan.md`](docs/testing/validation_plan.md)
 
 ```bash
 # Run coverage check
@@ -305,8 +309,6 @@ pytest --cov=src --cov-report=xml --cov-fail-under=80
 # Or use the Makefile target
 make test-coverage
 ```
-
-The validation plan covers unit, integration, and CLI testing with architecture-specific guidance for HTTPClient, layout-aware extraction, and download coordination. See [`VALIDATION_IMPLEMENTATION_SUMMARY.md`](VALIDATION_IMPLEMENTATION_SUMMARY.md) for delivered components.
 
 ### Security Auditing
 
@@ -354,11 +356,6 @@ Validation results are saved to `validation-results.json` for CI/CD integration:
   }
 }
 ```
-
-👉 Use the release checklist template at [`docs/validation-results/validation_checklist_template.md`](docs/validation-results/validation_checklist_template.md) to capture evidence. Helper scripts:
-
-- `python scripts/generate_test_pdfs.py` – regenerate synthetic fixtures for extractor testing
-- `python scripts/measure_performance.py` – capture baseline extraction/download performance
 
 ## Contributing
 
@@ -457,6 +454,45 @@ You'll see:
 - There is a known vulnerability (GHSA-f83h-ghpp-7wcc) in insecure deserialization
 - **Mitigation**: Only process trusted PDF files from reliable sources
 - This vulnerability requires write access to CMap directories (unlikely in normal use)
+
+## Configuration
+
+The application can be configured through settings in `src/config.py`:
+
+### Feature Flags
+```python
+# Download sources
+ENABLE_SCIHUB = True          # Enable Sci-Hub downloads
+ENABLE_PUBMED = True          # Enable PubMed access
+ENABLE_ARXIV = True           # Enable arXiv downloads
+ENABLE_BIORXIV = True         # Enable bioRxiv downloads
+ENABLE_CHEMRXIV = True        # Enable chemRxiv downloads
+ENABLE_OPEN_ACCESS = True      # Enable open-access sources
+
+# Extraction fallbacks
+ENABLE_PDF_FALLBACKS = True   # Enable all PDF fallbacks
+ENABLE_WEB_FALLBACKS = True    # Enable all web fallbacks
+ENABLE_BIBTEX_FALLBACK = True # Enable BibTeX parser
+ENABLE_TABLE_FALLBACK = True  # Enable table extractor
+ENABLE_HTML_FALLBACK = True   # Enable HTML fallback
+```
+
+### HTTP Settings
+```python
+TIMEOUT = 30                  # Request timeout (seconds)
+MAX_RETRIES = 3               # Maximum retry attempts
+RETRY_DELAY = 2               # Delay between retries (seconds)
+REQUEST_DELAY = 0.5           # Delay between requests (seconds)
+ARXIV_DELAY = 3               # Special delay for arXiv API
+```
+
+### File Settings
+```python
+MAX_FILE_SIZE = 100 * 1024 * 1024  # Maximum download size (100MB)
+OUTPUT_DIR = "./downloads"           # Download directory
+CACHE_DIR = "./.cache"               # Cache directory
+LOG_FILE = "./ref_downloader.log"    # Log file location
+```
 
 ## API Dependencies
 

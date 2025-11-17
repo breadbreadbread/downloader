@@ -49,6 +49,13 @@ class Settings:
     ENABLE_CHEMRXIV: bool = True
     ENABLE_OPEN_ACCESS: bool = True
     
+    # Extraction fallback flags
+    ENABLE_PDF_FALLBACKS: bool = True
+    ENABLE_WEB_FALLBACKS: bool = True
+    ENABLE_BIBTEX_FALLBACK: bool = True
+    ENABLE_TABLE_FALLBACK: bool = True
+    ENABLE_HTML_FALLBACK: bool = True
+    
     # Sci-Hub settings
     SCIHUB_URLS: list = [
         "https://www.sci-hub.se",
