@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from src.models import ExtractionResult, Reference
 from src.extractor.base import BaseExtractor
 from src.extractor.parser import ReferenceParser
+from src.extractor.fallbacks.html_fallback import HTMLFallbackExtractor
 from src.config import settings
 from src.network.http_client import HTTPClient
 
@@ -17,9 +18,23 @@ logger = logging.getLogger(__name__)
 class WebExtractor(BaseExtractor):
     """Extract references from web pages."""
     
-    def __init__(self):
+    def __init__(self, enable_fallbacks: Optional[bool] = None):
+        """
+        Initialize web extractor.
+        
+        Args:
+            enable_fallbacks: Whether to enable fallback extractors.
+                            If None, uses settings.ENABLE_WEB_FALLBACKS
+        """
         self.parser = ReferenceParser()
         self.http_client = HTTPClient()
+        self.html_fallback = HTMLFallbackExtractor()
+        
+        # Use provided value or fall back to settings
+        if enable_fallbacks is None:
+            self.enable_fallbacks = settings.ENABLE_WEB_FALLBACKS
+        else:
+            self.enable_fallbacks = enable_fallbacks
     
     def extract(self, source: str) -> ExtractionResult:
         """
@@ -45,7 +60,26 @@ class WebExtractor(BaseExtractor):
             
             html_text = response.text
             references_text = self._extract_references_from_html(html_text)
-            references = self._parse_references(references_text)
+            primary_refs = self._parse_references(references_text)
+            
+            # Apply HTML fallback if enabled and needed
+            if (self.enable_fallbacks and settings.ENABLE_HTML_FALLBACK):
+                fallback_refs_text = self.html_fallback.extract_from_html_structure(html_text)
+                fallback_refs = []
+                
+                # Parse each fallback reference text individually
+                for ref_text in fallback_refs_text:
+                    try:
+                        ref = self.parser.parse_reference(ref_text)
+                        if ref:
+                            fallback_refs.append(ref)
+                    except Exception as e:
+                        logger.warning(f"Error parsing fallback reference: {str(e)}")
+                
+                # Merge with deduplication
+                references = self._merge_references(primary_refs, fallback_refs)
+            else:
+                references = primary_refs
             
             result.references = references
             result.total_references = len(references)
@@ -127,3 +161,56 @@ class WebExtractor(BaseExtractor):
         references = [p.strip() for p in parts if p.strip() and len(p.strip()) > 10]
         
         return references if references else [text]
+    
+    def _merge_references(self, primary_refs: List[Reference], fallback_refs: List[Reference]) -> List[Reference]:
+        """
+        Merge references from primary and fallback sources with deduplication.
+        
+        Args:
+            primary_refs: References from primary extraction
+            fallback_refs: References from fallback extraction
+            
+        Returns:
+            Merged list of references
+        """
+        logger.debug(
+            f"Merging {len(primary_refs)} primary refs with "
+            f"{len(fallback_refs)} fallback refs"
+        )
+        
+        all_refs = list(primary_refs)
+        seen_texts = {self._normalize_ref_text(ref.raw_text) for ref in primary_refs}
+        
+        # Add fallback refs that aren't duplicates
+        added = 0
+        for ref in fallback_refs:
+            normalized = self._normalize_ref_text(ref.raw_text)
+            if normalized not in seen_texts:
+                # Add provenance metadata
+                if not ref.metadata:
+                    ref.metadata = {}
+                ref.metadata['extraction_method'] = 'html_fallback'
+                
+                all_refs.append(ref)
+                seen_texts.add(normalized)
+                added += 1
+        
+        logger.debug(f"Added {added} unique references from HTML fallback")
+        return all_refs
+    
+    def _normalize_ref_text(self, text: str) -> str:
+        """
+        Normalize reference text for duplicate detection.
+        
+        Args:
+            text: Reference text
+            
+        Returns:
+            Normalized text
+        """
+        import re
+        # Convert to lowercase, remove punctuation and extra whitespace
+        text = text.lower()
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\s+', ' ', text)
+        return text[:100].strip()
