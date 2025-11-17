@@ -1,141 +1,128 @@
-"""Tests for CLI interface and command-line functionality."""
+"""Focused smoke tests for CLI interface and command-line functionality."""
 
-import unittest
-import subprocess
-import tempfile
+from __future__ import annotations
+
 import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+
+import pytest
+
+from tests.e2e.test_cli_modes import make_test_pdf, run_cli
 
 
-class TestCLI(unittest.TestCase):
-    """Test command-line interface functionality."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.temp_dir = tempfile.mkdtemp()
-    
-    def tearDown(self):
-        """Clean up test files."""
-        import shutil
-        if os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
-    
-    def test_cli_help_display(self):
-        """Test CLI help message displays correctly."""
-        result = subprocess.run(
-            ["python", "-m", "src.main", "--help"],
-            capture_output=True,
-            text=True
-        )
-        
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("Extract references", result.stdout)
-        self.assertIn("--pdf", result.stdout)
-        self.assertIn("--url", result.stdout)
-        self.assertIn("--output", result.stdout)
-    
-    def test_cli_no_arguments(self):
-        """Test CLI fails gracefully with no arguments."""
-        result = subprocess.run(
-            ["python", "-m", "src.main"],
-            capture_output=True,
-            text=True
-        )
-        
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("error", result.stderr.lower())
-    
-    def test_cli_invalid_pdf_file(self):
-        """Test CLI handles non-existent PDF file."""
-        result = subprocess.run([
-            "python", "-m", "src.main",
-            "--pdf", "/nonexistent/file.pdf",
-            "--output", self.temp_dir
-        ], capture_output=True, text=True)
-        
-        # Should handle gracefully, not crash
-        self.assertIn("not found", result.stderr.lower())
-    
-    def test_cli_invalid_url(self):
-        """Test CLI handles invalid URL."""
-        result = subprocess.run([
-            "python", "-m", "src.main",
-            "--url", "not-a-url",
-            "--output", self.temp_dir
-        ], capture_output=True, text=True)
-        
-        self.assertIn("invalid url", result.stderr.lower())
-    
-    def test_cli_output_directory_creation(self):
-        """Test CLI creates output directory if it doesn't exist."""
-        output_path = os.path.join(self.temp_dir, "new", "nested", "dir")
-        
-        # Directory shouldn't exist initially
-        self.assertFalse(os.path.exists(output_path))
-        
-        # Create a simple test PDF
-        test_pdf = os.path.join(self.temp_dir, "test.pdf")
-        with open(test_pdf, 'w') as f:
-            f.write("Not a real PDF")
-        
-        result = subprocess.run([
-            "python", "-m", "src.main",
-            "--pdf", test_pdf,
-            "--output", output_path
-        ], capture_output=True, text=True)
-        
-        # Directory should be created (even if PDF processing fails)
-        self.assertTrue(os.path.exists(output_path))
-    
-    def test_cli_log_level_configuration(self):
-        """Test CLI log level configuration."""
-        test_pdf = os.path.join(self.temp_dir, "test.pdf")
-        with open(test_pdf, 'w') as f:
-            f.write("Not a real PDF")
-        
-        result = subprocess.run([
-            "python", "-m", "src.main",
-            "--pdf", test_pdf,
-            "--output", self.temp_dir,
-            "--log-level", "DEBUG"
-        ], capture_output=True, text=True)
-        
-        # Should not crash due to log level
-        self.assertTrue(True)  # If we get here, log level was accepted
-    
-    def test_cli_pdf_and_url_mutual_exclusion(self):
-        """Test CLI rejects both PDF and URL arguments."""
-        test_pdf = os.path.join(self.temp_dir, "test.pdf")
-        with open(test_pdf, 'w') as f:
-            f.write("Not a real PDF")
-        
-        result = subprocess.run([
-            "python", "-m", "src.main",
-            "--pdf", test_pdf,
-            "--url", "https://example.com",
-            "--output", self.temp_dir
-        ], capture_output=True, text=True)
-        
-        self.assertNotEqual(result.returncode, 0)
-    
-    def test_cli_successful_execution(self):
-        """Test CLI successful execution with minimal valid input."""
-        # This would require a real PDF for full testing
-        # For now, test that it doesn't crash on invalid input
-        test_pdf = os.path.join(self.temp_dir, "test.pdf")
-        with open(test_pdf, 'w') as f:
-            f.write("Not a real PDF")
-        
-        result = subprocess.run([
-            "python", "-m", "src.main",
-            "--pdf", test_pdf,
-            "--output", self.temp_dir
-        ], capture_output=True, text=True)
-        
-        # Should handle gracefully
-        self.assertTrue(True)  # If we get here, CLI didn't crash
+@pytest.fixture(name="project_root")
+def fixture_project_root() -> Path:
+    """Return the repository root used for PYTHONPATH wiring."""
+    return Path(__file__).resolve().parents[1]
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.fixture(name="cli_env")
+def fixture_cli_env(project_root: Path) -> dict[str, str]:
+    """Build a deterministic environment for invoking the CLI."""
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH")
+    paths: list[str] = [str(project_root)]
+    if existing:
+        paths.append(existing)
+    env["PYTHONPATH"] = os.pathsep.join(paths)
+    return env
+
+
+def _invoke_cli(tmp_path: Path, cli_env: dict[str, str], *args: str) -> str:
+    """Run the CLI and return combined stdout/stderr for assertions."""
+    result = run_cli(tmp_path, cli_env, *args)
+    combined = (result.stdout + result.stderr).lower()
+    returncode_msg = f"return code {result.returncode}: {combined}"
+    return combined, result.returncode, returncode_msg
+
+
+def test_cli_help_displays_usage(tmp_path: Path, cli_env: dict[str, str]) -> None:
+    combined, return_code, _ = _invoke_cli(tmp_path, cli_env, "--help")
+    assert return_code == 0
+    assert "extract references" in combined
+    assert "--pdf" in combined
+    assert "--url" in combined
+
+
+def test_cli_requires_input_source(tmp_path: Path, cli_env: dict[str, str]) -> None:
+    combined, return_code, _ = _invoke_cli(tmp_path, cli_env)
+    assert return_code == 1
+    assert "either --pdf or --url must be specified" in combined
+
+
+def test_cli_pdf_and_url_are_mutually_exclusive(tmp_path: Path, cli_env: dict[str, str]) -> None:
+    pdf_path = tmp_path / "inputs" / "test.pdf"
+    make_test_pdf(pdf_path, num_refs=1)
+
+    combined, return_code, message = _invoke_cli(
+        tmp_path,
+        cli_env,
+        "--pdf",
+        str(pdf_path),
+        "--url",
+        "https://example.com/paper",
+        "--output",
+        str(tmp_path / "outputs"),
+        "--skip-download",
+    )
+
+    assert return_code == 1, message
+    assert "cannot specify both --pdf and --url" in combined
+
+
+def test_cli_reports_missing_pdf(tmp_path: Path, cli_env: dict[str, str]) -> None:
+    missing_pdf = tmp_path / "inputs" / "missing.pdf"
+
+    combined, return_code, message = _invoke_cli(
+        tmp_path,
+        cli_env,
+        "--pdf",
+        str(missing_pdf),
+        "--output",
+        str(tmp_path / "outputs"),
+        "--skip-download",
+    )
+
+    assert return_code == 1, message
+    assert "pdf file not found" in combined
+
+
+def test_cli_creates_output_directory(tmp_path: Path, cli_env: dict[str, str]) -> None:
+    pdf_path = tmp_path / "inputs" / "test.pdf"
+    make_test_pdf(pdf_path, num_refs=2)
+    output_dir = tmp_path / "nested" / "reports"
+
+    combined, return_code, message = _invoke_cli(
+        tmp_path,
+        cli_env,
+        "--pdf",
+        str(pdf_path),
+        "--output",
+        str(output_dir),
+        "--skip-download",
+    )
+
+    assert return_code == 0, message
+    assert output_dir.exists()
+    report = output_dir / "download_report.json"
+    assert report.exists(), combined
+
+
+def test_cli_accepts_log_level(tmp_path: Path, cli_env: dict[str, str]) -> None:
+    pdf_path = tmp_path / "inputs" / "test.pdf"
+    make_test_pdf(pdf_path, num_refs=1)
+
+    combined, return_code, message = _invoke_cli(
+        tmp_path,
+        cli_env,
+        "--pdf",
+        str(pdf_path),
+        "--output",
+        str(tmp_path / "outputs"),
+        "--skip-download",
+        "--log-level",
+        "DEBUG",
+    )
+
+    assert return_code == 0, message
+    assert "extracting references" in combined

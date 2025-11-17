@@ -2,60 +2,70 @@
 
 ## Delivered Components
 
-### 1. Comprehensive Validation Plan Document
+### 1. Updated Validation Plan Document
 **Location**: `docs/testing/validation_plan.md`
 
-**Content**: 28-page comprehensive testing strategy covering:
-- Objectives and success metrics (>80% coverage, performance targets)
-- Environment setup requirements (Python 3.8+, dependency matrix)
-- Full test matrix (unit, integration, end-to-end, manual, performance)
-- HTTP hardening validation (mock services, real failure scenarios)
-- PDF extraction scenarios (1-3 column layouts, caption filtering)
-- Dependency validation procedures (pip check, pip-audit)
-- CLI interface testing
-- Performance baseline establishment
-- Manual validation procedures
+**Content**: Pragmatic validation strategy reflecting current architecture:
+- Objectives and success metrics (≥80% coverage, performance targets)
+- Architecture context table (HTTPClient, layout-aware extractor, fallback roadmap)
+- Environment setup requirements (Python 3.8–3.12, requirements-dev.txt)
+- Test matrix with commands (unit, integration, CLI, E2E)
+- Test data strategy (synthetic fixtures, HTML fixtures, mock HTTP)
+- Helper scripts (generate_test_pdfs.py, measure_performance.py)
+- Manual/exploratory validation workflows
+- Performance baseline documentation (baseline.json, regression guards)
+- Evidence capture and maintenance rhythm
 
-### 2. Enhanced Test Suite
+### 2. Adapted & Enhanced Test Suite
 **Location**: `tests/`
 
-**New Test Files Created**:
-- `test_http_hardening.py` - 8 tests for HTTP error handling, timeouts, SSL verification
-- `test_cli.py` - 8 tests for command-line interface functionality  
-- `test_download_coordinator.py` - 6 tests for fallback pipeline and coordination
+**Test Files Updated for Current Architecture**:
+- `test_http_hardening.py` - **Adapted** to mock HTTPClient instead of requests.Session (8 tests)
+  - Tests timeout handling, 403 retries, User-Agent headers, SSL verification
+  - Uses `patch.object(downloader.http_client, 'get')` pattern
+- `test_cli.py` - **Rewritten** to use shared `run_cli` helper from e2e tests (6 focused smoke tests)
+  - Uses `--skip-download` to avoid real network I/O
+  - Validates help, missing inputs, mutually exclusive flags, output dir creation
+- `test_download_coordinator.py` - **Rewritten** to use pytest fixtures and mock patterns (6 tests)
+  - Confirms fallback execution order, duplicate skipping, all-sources-fail behavior
+  - No reliance on actual HTTP calls
 
-**Total Test Coverage**: 40 tests (18 original + 22 new)
-- All tests passing ✅
-- Coverage of HTTP hardening, CLI, and download coordination
+**Test Coverage**: All tests compatible with pytest, using architecture-aware mocking (HTTPClient, DownloadCoordinator, PDFExtractor). Coverage ≥80% enforced via `pytest.ini`.
 
 ### 3. Test Data Infrastructure
-**Location**: `tests/fixtures/` (directory created)
+**Location**: `tests/fixtures/`
 
-**Structure Ready For**:
-- `synthetic/` - Programmatically generated test PDFs
-- `real-world/` - Sanitized academic paper samples
-- `mock-services/` - HTTP response mocks for testing
+**Current Assets**:
+- `synthetic/` – Programmatically generated PDFs (single/two/three column, caption noise)
+- `fixture_generator.py` – Utility for building synthetic PDFs on demand (see `tests/fixtures/`)
+- HTML snippets embedded directly in tests for deterministic web extraction
 
-### 4. Validation Scripts
+Real-world fixtures can be added under `tests/fixtures/real-world/` when needed (document provenance in the validation checklist).
+
+### 4. Hardened Validation Scripts
 **Location**: `scripts/`
 
-**Scripts Created**:
-- `generate_test_pdfs.py` - Generates synthetic PDFs for testing
-  - Single-column papers (20/50 references)
-  - Two-column IEEE-style papers (20/50 references)
-  - Three-column Nature-style papers (20/50 references)
-  - Papers with figure/table captions (to test filtering)
+**Scripts Hardened**:
+- `generate_test_pdfs.py` – **Enhanced with usage docstring and module guard**
+  - Generates single/two/three-column PDFs with reference counts 20/50
+  - Includes caption noise (Figure/Table) for filtering tests
+  - Dependencies: reportlab (already in requirements.txt)
+  - Usage: `python scripts/generate_test_pdfs.py`
+  
+- `measure_performance.py` – **Enhanced with usage docstring and module guard**
+  - Measures extraction time/memory across synthetic fixtures
+  - Outputs `docs/validation-results/performance/baseline.json`
+  - Dependencies: psutil (in requirements-dev.txt)
+  - Usage: `python scripts/measure_performance.py`
 
-- `measure_performance.py` - Performance baseline establishment
-  - Extraction performance measurement
-  - Memory usage profiling
-  - Download coordination overhead measurement
-  - Baseline comparison against targets
+Both scripts ship with module guards (`if __name__ == "__main__"`) and inline documentation.
 
 ### 5. Documentation Integration
 **Updated Files**:
-- `README.md` - Added testing section with validation plan reference
-- `PLAN.md` - Added quality assurance section linking to validation plan
+- `README.md` – Links to validation plan and helper scripts in Testing section
+- `PLAN.md` – New "Validation & Quality Assurance" section with architecture-specific focus
+- `QUICKSTART.md` – New "Validation & Testing" section with quick commands
+- `docs/testing/validation_plan.md` – Completely rewritten to reflect HTTPClient, layout-aware extractor, fallback roadmap
 
 ### 6. Validation Evidence Collection
 **Location**: `docs/validation-results/`
@@ -93,29 +103,26 @@
 
 ### ✅ Fallback Pipeline Validation
 - Download coordinator priority chain testing
-- Duplicate prevention
-- Error handling and logging
-- Source failover mechanisms
-- Parallel vs sequential processing
+- Duplicate prevention via existing file detection
+- Error handling (all downloaders failed, not found states)
+- Source failover mechanisms (DOI → arXiv → PubMed → Sci-Hub)
 
 ### ✅ Dependency Validation
-- pip check integration (no broken requirements)
-- pip-audit security scanning
-- Version compatibility matrix
-- Import validation across Python versions
+- `pip check` integration (no broken requirements)
+- `pip-audit` security scanning (pdfminer.six advisory documented)
+- Version compatibility matrix (Python 3.8–3.12 smoke tests)
 
 ### ✅ CLI Interface Validation
-- PDF and URL mode testing
-- Output directory creation
-- Log level configuration
-- Error message formatting
-- Help documentation completeness
+- PDF and URL mode testing via shared `run_cli` helper
+- Output directory creation and report generation
+- Log level configuration including DEBUG runs
+- Error messaging for missing inputs / mutually exclusive flags
 
 ### ✅ Performance Validation
-- Baseline establishment procedures
+- Baseline establishment via `scripts/measure_performance.py`
 - Regression detection (>20% degradation threshold)
-- Memory usage monitoring (<500MB target)
-- Large batch processing stability
+- Memory usage monitoring (<120 MB delta target)
+- Evidence stored in `docs/validation-results/performance/baseline.json`
 
 ## Success Metrics Defined
 

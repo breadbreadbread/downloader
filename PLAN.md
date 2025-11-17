@@ -83,6 +83,23 @@ reference-downloader/
 └── .gitignore
 ```
 
+## Validation & Quality Assurance
+
+A pragmatic validation strategy focuses on:
+
+- **HTTPClient behavior**: timeout, retry, User-Agent rotation (tests in `tests/test_http_hardening.py`)
+- **Layout-aware PDF extraction**: multi-column accuracy, caption filtering (`tests/test_pdf_extractor.py`, `tests/test_extraction_fallbacks.py`)
+- **Download coordination**: fallback chains, duplicate skipping (`tests/test_download_coordinator.py`)
+- **CLI stability**: error paths, report generation with `--skip-download` (`tests/test_cli.py`, `tests/e2e/test_cli_modes.py`)
+- **Performance baselines**: extraction time/memory guardrails (`scripts/measure_performance.py`)
+
+**Full details**: [`docs/testing/validation_plan.md`](docs/testing/validation_plan.md)  
+**Implementation summary**: [`VALIDATION_IMPLEMENTATION_SUMMARY.md`](VALIDATION_IMPLEMENTATION_SUMMARY.md)
+
+All tests use pytest with ≥80% coverage requirement (enforced in `pytest.ini`). Helper scripts (`scripts/generate_test_pdfs.py`, `scripts/measure_performance.py`) rely only on pinned dependencies.
+
+---
+
 ## Key Dependencies
 
 ### Audited Core Runtime Dependencies (Active)

@@ -6,7 +6,7 @@ from typing import List
 import time
 
 from src.models import (
-    Reference, DownloadResult, DownloadStatus, DownloadSummary
+    Reference, DownloadResult, DownloadStatus, DownloadSummary, DownloadSource
 )
 from src.downloader.base import BaseDownloader
 from src.downloader.doi_resolver import DOIResolver
@@ -67,7 +67,7 @@ class DownloadCoordinator:
                 result = DownloadResult(
                     reference=reference,
                     status=DownloadStatus.SKIPPED,
-                    source=None,
+                    source=DownloadSource.UNKNOWN,
                     file_path=str(output_path),
                     file_size=output_path.stat().st_size
                 )
@@ -139,6 +139,6 @@ class DownloadCoordinator:
         return DownloadResult(
             reference=reference,
             status=DownloadStatus.FAILED,
-            source=None,
+            source=DownloadSource.UNKNOWN,
             error_message="All download sources failed"
         )
