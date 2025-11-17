@@ -2,7 +2,7 @@
 
 from typing import Optional, List, Dict, Any
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class DownloadSource(str, Enum):
@@ -83,15 +83,14 @@ class Reference(BaseModel):
 class DownloadResult(BaseModel):
     """Result of a download attempt."""
     
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     reference: Reference
     status: DownloadStatus
     source: DownloadSource
     file_path: Optional[str] = Field(None, description="Path to downloaded file")
     error_message: Optional[str] = Field(None, description="Error message if failed")
     file_size: Optional[int] = Field(None, description="Size of downloaded file in bytes")
-    
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class ExtractionResult(BaseModel):
