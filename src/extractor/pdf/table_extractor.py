@@ -1,110 +1,160 @@
 """Table-based reference extraction from PDF documents."""
 
 import logging
-from typing import List
-import pdfplumber
-
-from src.models import Reference
-from src.extractor.parser import ReferenceParser
+import re
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class TableExtractor:
-    """Extract references from tables in PDF documents."""
-    
+    """
+    Extract references from tables in PDF documents.
+
+    Some academic papers organize references in table format.
+    This extractor identifies and extracts such references.
+    """
+
     def __init__(self):
-        self.parser = ReferenceParser()
-    
-    def extract_from_pdf(self, pdf_object) -> List[Reference]:
+        """Initialize the table extractor."""
+        self.min_table_rows = 3  # Minimum rows to consider as a reference table
+
+    def extract_from_tables(self, pdf) -> List[str]:
         """
-        Extract references from PDF tables.
-        
+        Extract reference text from tables in a PDF.
+
         Args:
-            pdf_object: pdfplumber PDF object
-            
+            pdf: pdfplumber PDF object
+
         Returns:
             List of Reference objects extracted from tables
         """
-        references = []
-        
-        try:
-            for page_num, page in enumerate(pdf_object.pages):
-                try:
-                    tables = page.extract_tables()
-                    
-                    for table_idx, table in enumerate(tables):
-                        if not table:
-                            continue
-                        
-                        # Check if this looks like a reference table
-                        table_text = self._normalize_table_cells(table)
-                        if self._looks_like_reference_table(table_text):
-                            table_refs = self._parse_table_references(table_text)
-                            references.extend(table_refs)
-                            logger.info(f"Extracted {len(table_refs)} references from table {table_idx+1} on page {page_num+1}")
-                        
-                except Exception as e:
-                    logger.warning(f"Error extracting tables from page {page_num}: {str(e)}")
-                    
-        except Exception as e:
-            logger.error(f"Error in table extraction: {str(e)}")
-        
-        return references
-    
-    def _normalize_table_cells(self, table: List[List[str]]) -> str:
-        """Normalize table cells into a coherent text string."""
-        normalized_rows = []
-        
-        for row in table:
-            if not row:
-                continue
-            
-            # Filter out empty cells and strip whitespace
-            cells = [cell.strip() for cell in row if cell and cell.strip()]
-            
-            if cells:
-                # Join cells with reasonable spacing
-                row_text = " ".join(cells)
-                normalized_rows.append(row_text)
-        
-        return "\n".join(normalized_rows)
-    
-    def _looks_like_reference_table(self, text: str) -> bool:
-        """Heuristically determine if table text contains references."""
-        if not text or len(text.strip()) < 50:
+        logger.debug("Starting table-based extraction")
+
+        all_references = []
+
+        for page_num, page in enumerate(pdf.pages):
+            try:
+                tables = page.extract_tables()
+
+                if not tables:
+                    continue
+
+                logger.debug(f"Found {len(tables)} tables on page {page_num + 1}")
+
+                for table_idx, table in enumerate(tables):
+                    if self._is_reference_table(table):
+                        logger.debug(
+                            f"Table {table_idx + 1} on page {page_num + 1} appears to be a reference table"
+                        )
+                        refs = self._extract_references_from_table(table)
+                        all_references.extend(refs)
+                        logger.debug(f"Extracted {len(refs)} references from table")
+
+            except Exception as e:
+                logger.warning(
+                    f"Error extracting tables from page {page_num}: {str(e)}"
+                )
+
+        logger.debug(f"Total references extracted from tables: {len(all_references)}")
+        return all_references
+
+    def _is_reference_table(self, table: List[List[Any]]) -> bool:
+        """
+        Check if a table contains references.
+
+        Args:
+            table: Extracted table data
+
+        Returns:
+            True if table appears to contain references
+        """
+        if not table or len(table) < self.min_table_rows:
             return False
-        
-        # Look for reference patterns
-        import re
-        patterns = [
-            r'\b\d{4}\b',  # Years
-            r'\bdoi:\s*10\.|10\.\d+',  # DOI patterns
-            r'\bvol\.?\s*\d+|volume\s*\d+',  # Volume patterns
-            r'\bpp\.?\s*\d+|pages?\s*\d+',  # Page patterns
-            r'\[?\d+\]?',  # Reference numbers
-        ]
-        
-        pattern_matches = sum(1 for pattern in patterns if re.search(pattern, text, re.IGNORECASE))
-        
-        # Consider it a reference table if it matches multiple patterns
-        return pattern_matches >= 2
-    
-    def _parse_table_references(self, text: str) -> List[Reference]:
-        """Parse references from normalized table text."""
+
+        # Check if table has reference-like content
+        reference_indicators = 0
+        total_cells = 0
+
+        for row in table[: min(10, len(table))]:  # Check first 10 rows
+            for cell in row:
+                if cell and isinstance(cell, str):
+                    total_cells += 1
+                    cell_lower = cell.lower()
+
+                    # Check for reference indicators
+                    if any(
+                        indicator in cell_lower
+                        for indicator in [
+                            "doi",
+                            "http",
+                            "author",
+                            "journal",
+                            "published",
+                            "19",
+                            "20",  # Years
+                        ]
+                    ):
+                        reference_indicators += 1
+
+                    # Check for year patterns
+                    if re.search(r"\b(19|20)\d{2}\b", cell):
+                        reference_indicators += 1
+
+        # If >30% of cells have reference indicators, consider it a reference table
+        if total_cells > 0 and (reference_indicators / total_cells) > 0.3:
+            return True
+
+        return False
+
+    def _extract_references_from_table(self, table: List[List[Any]]) -> List[str]:
+        """
+        Extract reference strings from a table.
+
+        Args:
+            table: Extracted table data
+
+        Returns:
+            List of reference text strings
+        """
         references = []
-        
-        # Split by lines and treat each line as a potential reference
-        lines = text.split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            if len(line) > 20:  # Minimum length for meaningful reference
-                try:
-                    ref = self.parser.parse_reference(line)
-                    if ref:
-                        references.append(ref)
-                except Exception as e:
-                    logger.debug(f"Failed to parse table reference: {line[:50]}... - {str(e)}")
-        
+
+        for row_idx, row in enumerate(table):
+            # Skip header row if present
+            if row_idx == 0:
+                row_text = " ".join(str(cell or "") for cell in row).lower()
+                if any(
+                    header in row_text
+                    for header in ["author", "title", "journal", "year", "reference"]
+                ):
+                    logger.debug(f"Skipping header row: {row_text[:50]}")
+                    continue
+
+            # Combine cells in the row to form a reference
+            ref_text = " ".join(str(cell or "") for cell in row if cell)
+
+            # Only include if it looks substantial
+            if len(ref_text.strip()) > 20:
+                references.append(ref_text.strip())
+
         return references
+
+    def has_tables(self, pdf) -> bool:
+        """
+        Check if PDF contains any tables.
+
+        Args:
+            pdf: pdfplumber PDF object
+
+        Returns:
+            True if PDF contains tables
+        """
+        for page in pdf.pages[:5]:  # Check first 5 pages
+            try:
+                tables = page.extract_tables()
+                if tables:
+                    return True
+            except Exception:
+                pass
+
+        return False
