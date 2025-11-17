@@ -10,6 +10,10 @@ A comprehensive Python application that extracts bibliographic references from P
   - Intelligent filtering of figure captions, tables, and non-reference content
   - Extract references from web pages
   - Support for multiple reference formats (Harvard, APA, Chicago, etc.)
+  - **Extraction fallback strategies** for edge cases:
+    - Table-based extraction: Detects and extracts references from PDF tables
+    - BibTeX parsing: Handles embedded BibTeX blocks with full metadata
+    - HTML structure analysis: Extracts from lists, citations, and structured elements
   - Identification and extraction of DOI, URLs, PMID, and arXiv IDs
   - Author, title, journal, year, and page number extraction
   - **Extraction Fallbacks** (configurable):
@@ -179,6 +183,30 @@ The client will randomly select and rotate through these agents on 403 errors.
 - `DownloadResult`: Result of a download attempt
 - `DownloadSummary`: Summary of all download results
 - `ExtractionResult`: Result of reference extraction
+
+## Configuration
+
+The application can be configured through `src/config.py`:
+
+### Fallback Extraction Settings
+- `FALLBACK_MIN_REFERENCE_THRESHOLD`: Minimum reference count to trigger fallbacks (default: 3)
+- `ENABLE_TABLE_FALLBACK`: Enable table-based extraction fallback (default: True)
+- `ENABLE_BIBTEX_FALLBACK`: Enable BibTeX parsing fallback (default: True) 
+- `ENABLE_HTML_STRUCTURE_FALLBACK`: Enable HTML structure analysis fallback (default: True)
+
+### Download Sources
+- `ENABLE_SCIHUB`: Enable Sci-Hub downloads (default: True)
+- `ENABLE_PUBMED`: Enable PubMed downloads (default: True)
+- `ENABLE_ARXIV`: Enable arXiv downloads (default: True)
+- `ENABLE_BIORXIV`: Enable bioRxiv downloads (default: True)
+- `ENABLE_CHEMRXIV`: Enable chemRxiv downloads (default: True)
+- `ENABLE_OPEN_ACCESS`: Enable open access downloads (default: True)
+
+### Network Settings
+- `TIMEOUT`: Request timeout in seconds (default: 30)
+- `MAX_RETRIES`: Maximum retry attempts (default: 3)
+- `REQUEST_DELAY`: Delay between requests in seconds (default: 0.5)
+- `ARXIV_DELAY`: Special delay for arXiv API compliance (default: 3.0)
 
 ## Download Strategy
 

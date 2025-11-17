@@ -117,97 +117,34 @@ result = ExtractionResult(
     references: List[Reference] = [],
     total_references: int = 0,
     extraction_errors: List[str] = [],
-)
-```
+    )
+    ```
 
-## Network Module
+    ### ExtractionFallbackManager
 
-### HTTPClient
+    Manages fallback extraction strategies for edge cases.
 
-Centralized HTTP client with retry logic and User-Agent rotation.
+    ```python
+    from src.extractor.fallbacks import ExtractionFallbackManager
 
-```python
-from src.network import HTTPClient
+    fallback_manager = ExtractionFallbackManager()
+    ```
 
-# Create HTTP client
-client = HTTPClient(timeout=30)
+    **Configuration:**
+    - `FALLBACK_MIN_REFERENCE_THRESHOLD`: Minimum references to trigger fallbacks
+    - `ENABLE_TABLE_FALLBACK`: Enable table-based extraction
+    - `ENABLE_BIBTEX_FALLBACK`: Enable BibTeX parsing fallback
+    - `ENABLE_HTML_STRUCTURE_FALLBACK`: Enable HTML structure analysis fallback
 
-# Perform GET request with automatic retry
-response = client.get("https://example.com/page")
-print(response.status_code)
-print(response.text)
+    **Methods:**
+    - `should_trigger_fallbacks(result: ExtractionResult) -> bool`: Check if fallbacks needed
+    - `apply_fallbacks(result, source_text, source_type, pdf_object=None, html_content=None) -> ExtractionResult`: Apply fallback strategies
+    - `_extract_from_tables(pdf_object) -> List[Reference]`: Extract from PDF tables
+    - `_extract_from_bibtex(text) -> List[Reference]`: Parse BibTeX entries
+    - `_extract_from_html_structure(html) -> List[Reference]`: Extract from HTML elements
+    - `_deduplicate_references(references, existing_fingerprints) -> List[Reference]`: Remove duplicates
 
-# With custom headers
-response = client.get(
-    "https://api.example.com/endpoint",
-    headers={"X-API-Key": "your-key"}
-)
-
-# POST request
-response = client.post(
-    "https://api.example.com/submit",
-    json={"key": "value"}
-)
-
-# Use as context manager
-with HTTPClient() as client:
-    response = client.get("https://example.com")
-    print(response.text)
-```
-
-**Features:**
-
-- **Automatic retry logic**: Retries on 403, 429, 500, 502, 503, 504 errors
-- **User-Agent rotation**: Rotates through pool of browser User-Agents on 403 errors
-- **Exponential backoff**: Increases delay between retries
-- **Browser headers**: Sends realistic browser headers (Accept, Accept-Language, etc.)
-- **Retry-After respect**: Honors Retry-After headers from servers
-- **Debug logging**: Logs request attempts and responses at DEBUG level
-
-**Parameters:**
-
-- `timeout` (int, optional): Request timeout in seconds (defaults to `settings.TIMEOUT`)
-
-**Methods:**
-
-- `get(url, headers=None, allow_redirects=True, stream=False, **kwargs) -> requests.Response`: 
-  - Perform GET request with retry logic
-  - Automatically rotates User-Agent on 403 errors
-  - Raises `requests.RequestException` on failure after all retries
-
-- `post(url, data=None, json=None, headers=None, **kwargs) -> requests.Response`:
-  - Perform POST request
-  - Raises `requests.RequestException` on failure
-
-- `close()`: Close the session (automatically called when used as context manager)
-
-**Configuration (in `src/config.py`):**
-
-- `MAX_RETRIES`: Number of retry attempts (default: 3)
-- `RETRY_DELAY`: Base delay between retries in seconds (default: 2)
-- `REQUEST_DELAY`: Delay between requests (default: 0.5)
-- `USER_AGENT_POOL`: List of User-Agent strings to rotate (default: 6 browser variants)
-
-**Example with 403 recovery:**
-
-```python
-from src.network import HTTPClient
-import logging
-
-# Enable debug logging to see retry attempts
-logging.basicConfig(level=logging.DEBUG)
-
-client = HTTPClient()
-
-# This will automatically retry with fresh User-Agent if 403 is received
-try:
-    response = client.get("https://example.com/protected-page")
-    print("Success!", response.status_code)
-except Exception as e:
-    print(f"Failed after retries: {e}")
-```
-
-## Extractor Module
+    ## Extractor Module
 
 ### PDFExtractor
 

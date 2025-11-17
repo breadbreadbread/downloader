@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from src.models import ExtractionResult, Reference
 from src.extractor.base import BaseExtractor
 from src.extractor.parser import ReferenceParser
-from src.extractor.fallbacks.html_fallback import HTMLFallbackExtractor
+from src.extractor.fallbacks import ExtractionFallbackManager
 from src.config import settings
 from src.network.http_client import HTTPClient
 
@@ -27,14 +27,9 @@ class WebExtractor(BaseExtractor):
                             If None, uses settings.ENABLE_WEB_FALLBACKS
         """
         self.parser = ReferenceParser()
-        self.http_client = HTTPClient()
-        self.html_fallback = HTMLFallbackExtractor()
-        
-        # Use provided value or fall back to settings
-        if enable_fallbacks is None:
-            self.enable_fallbacks = settings.ENABLE_WEB_FALLBACKS
-        else:
-            self.enable_fallbacks = enable_fallbacks
+        self.fallback_manager = ExtractionFallbackManager()
+        self.session = requests.Session()
+        self.session.headers.update({"User-Agent": settings.USER_AGENT})
     
     def extract(self, source: str) -> ExtractionResult:
         """
@@ -84,7 +79,17 @@ class WebExtractor(BaseExtractor):
             result.references = references
             result.total_references = len(references)
             
-            logger.info(f"Extracted {len(references)} references from {source}")
+            logger.info(f"Primary extraction found {len(references)} references from {source}")
+            
+            # Apply fallback strategies if needed
+            result = self.fallback_manager.apply_fallbacks(
+                result=result,
+                source_text=references_text,
+                source_type='web',
+                html_content=html_text
+            )
+            
+            logger.info(f"Final extraction result: {len(result.references)} references from {source}")
             
         except requests.RequestException as e:
             error_msg = f"Error fetching URL: {str(e)}"
