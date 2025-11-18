@@ -195,36 +195,36 @@ def create_sample_table_text():
 def save_test_fixtures():
     """Save test fixtures to temporary files for testing."""
     fixtures = {}
-    
+
     # Create temporary directory for fixtures
     temp_dir = tempfile.mkdtemp(prefix="ref_downloader_test_")
-    
+
     # Save HTML fixtures
     html_lists = create_sample_html_with_lists()
     html_lists_path = Path(temp_dir) / "test_html_lists.html"
-    with open(html_lists_path, 'w', encoding='utf-8') as f:
+    with open(html_lists_path, "w", encoding="utf-8") as f:
         f.write(html_lists)
-    fixtures['html_lists'] = str(html_lists_path)
-    
+    fixtures["html_lists"] = str(html_lists_path)
+
     html_citations = create_sample_html_with_citations()
     html_citations_path = Path(temp_dir) / "test_html_citations.html"
-    with open(html_citations_path, 'w', encoding='utf-8') as f:
+    with open(html_citations_path, "w", encoding="utf-8") as f:
         f.write(html_citations)
-    fixtures['html_citations'] = str(html_citations_path)
-    
+    fixtures["html_citations"] = str(html_citations_path)
+
     # Save text fixtures
     bibtex_text = create_sample_text_with_bibtex()
     bibtex_path = Path(temp_dir) / "test_bibtex.txt"
-    with open(bibtex_path, 'w', encoding='utf-8') as f:
+    with open(bibtex_path, "w", encoding="utf-8") as f:
         f.write(bibtex_text)
-    fixtures['bibtex_text'] = str(bibtex_path)
-    
+    fixtures["bibtex_text"] = str(bibtex_path)
+
     table_text = create_sample_table_text()
     table_path = Path(temp_dir) / "test_table.txt"
-    with open(table_path, 'w', encoding='utf-8') as f:
+    with open(table_path, "w", encoding="utf-8") as f:
         f.write(table_text)
-    fixtures['table_text'] = str(table_path)
-    
+    fixtures["table_text"] = str(table_path)
+
     return fixtures, temp_dir
 
 

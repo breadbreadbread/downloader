@@ -6,9 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.extractor.bibtex_parser import BibTeXParser
-from src.extractor.html_fallback import HTMLFallbackExtractor
-from src.extractor.pdf.table_extractor import TableExtractor
+from src.extractor.fallbacks import BibTeXParser, HTMLFallbackExtractor, TableExtractor
 from src.extractor.pdf_extractor import PDFExtractor
 from tests.fixtures.fixture_generator import (
     generate_html_with_references,
